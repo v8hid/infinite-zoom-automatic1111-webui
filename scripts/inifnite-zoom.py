@@ -6,6 +6,16 @@ from modules import script_callbacks
 from webui import wrap_gradio_gpu_call
 basedirs = [os.getcwd()]
 
+inpaint_model_list = [
+    "stabilityai/stable-diffusion-2-inpainting",
+    "runwayml/stable-diffusion-inpainting",
+    "parlance/dreamlike-diffusion-1.0-inpainting",
+    "ghunkins/stable-diffusion-liberty-inpainting",
+    "ImNoOne/f222-inpainting-diffusers"
+]
+default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
+default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
+
 
 def zoom(
     model_id,
