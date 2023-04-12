@@ -3,7 +3,7 @@ import os
 import time
 
 basedir = os.getcwd()
-sys.path.extend(basedir + "/extensions/infinite-zoom-sd-webui/")
+sys.path.extend(basedir + "/extensions/infinite-zoom-automatic1111-webui/")
 import numpy as np
 import gradio as gr
 from PIL import Image
@@ -20,7 +20,7 @@ from modules.processing import (
 
 from modules.ui import create_output_panel, plaintext_to_html
 
-output_path = basedir + "/extensions/infinite-zoom-sd-webui/out"
+output_path = basedir + "/extensions/infinite-zoom-automatic1111-webui/out"
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
 
@@ -218,8 +218,9 @@ def create_zoom(
     save_path = os.path.join(output_path, "videos")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+    out = os.path.join(save_path, video_file_name)
     write_video(
-        os.path.join(save_path, video_file_name),
+        out,
         all_frames,
         video_frame_rate,
         video_zoom_mode,
@@ -228,7 +229,7 @@ def create_zoom(
     )
 
     return (
-        save_path,
+        out,
         processed.images,
         processed.js(),
         plaintext_to_html(processed.info),
