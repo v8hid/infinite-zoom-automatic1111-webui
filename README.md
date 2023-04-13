@@ -1,4 +1,4 @@
-# Infinite zoome extension for  [Stable Diffusion WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui/).
+# Infinite Zoom extension for  [Stable Diffusion WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui/).
 This is an extension for the SD-WebUI AUTOMATIC1111's webui that allows users to create infinite zoom effect videos using stable diffusion outpainting method. 
 
 ## Installation
@@ -9,7 +9,7 @@ This is an extension for the SD-WebUI AUTOMATIC1111's webui that allows users to
 
 2. Go to the `Extensions tab` > `Install from URL`.
 
-3. Enter `https://github.com/v8hid/infinite-zoom-automatic1111-webui.git` for the URL and leave the second field empty.
+3. Enter `https://github.com/v8hid/infinite-zoom-automatic1111-webui.git` for the URL and leave the second field empty and wait for it to be installed.
 > <img width="587" alt="Screenshot 2023-04-12 at 10 17 32 PM" src="https://user-images.githubusercontent.com/62482657/231554653-16484c48-582e-489d-8191-bafc4cccbd3b.png">
 
 4. Go to the Installed tab and press Apply and restart.
@@ -25,8 +25,9 @@ This is an extension for the SD-WebUI AUTOMATIC1111's webui that allows users to
 <details>
   <summary> Click to expand </summary>
   
+ 1. Click on the Infinite Zoom tab
  <img width="1431" alt="Screenshot 2023-04-12 at 10 14 50 PM" src="https://user-images.githubusercontent.com/62482657/231571341-92767f0d-af36-4b94-8ba9-c40a63c209ba.png">
-
+ 2. Modify the inputs as you wish and click Generate video, the video will appear as soon as it generates
  </details>
   
  ### **Important Tip:**
@@ -38,7 +39,6 @@ This is an extension for the SD-WebUI AUTOMATIC1111's webui that allows users to
 
 <details>
   <summary> Click to expand </summary>
-  
 
 
 https://user-images.githubusercontent.com/62482657/231573289-2db85c57-540d-4c7d-859f-3c3ddfcd2c8a.mp4
