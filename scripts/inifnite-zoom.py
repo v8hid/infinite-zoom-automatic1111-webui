@@ -266,7 +266,7 @@ def on_ui_tabs():
 
                     outpaint_steps = gr.Slider(
                         minimum=2,
-                        maximum=25,
+                        maximum=100,
                         step=1,
                         value=8,
                         label="Total Outpaint Steps",
