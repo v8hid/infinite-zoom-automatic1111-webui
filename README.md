@@ -6,7 +6,7 @@
     </a>
 </p>
 
-This is an extension for the SD-WebUI AUTOMATIC1111's webui that allows users to create infinite zoom effect videos using stable diffusion outpainting method. 
+This is an extension for the AUTOMATIC1111's webui that allows users to create infinite zoom effect videos using stable diffusion outpainting method. 
 
 
 ## Installation
