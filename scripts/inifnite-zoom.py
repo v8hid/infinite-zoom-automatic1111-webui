@@ -345,9 +345,7 @@ def on_ui_tabs():
                     )
 
             with gr.Column(scale=1, variant="compact"):
-                output_video = gr.Video(
-                    label="Output", format="mp4", interactive=True
-                ).style(width=512, height=512)
+                output_video = gr.Video(label="Output").style(width=512, height=512)
                 (
                     out_image,
                     generation_info,
