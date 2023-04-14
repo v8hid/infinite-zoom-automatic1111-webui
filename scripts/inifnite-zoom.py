@@ -105,6 +105,7 @@ def create_zoom(
     inpainting_fill_mode,
     inpainting_full_res,
     inpainting_padding,
+    zoom_speed,
 ):
     prompts = {}
     for x in prompts_array:
@@ -139,7 +140,7 @@ def create_zoom(
         )
         current_image = processed.images[0]
     mask_width = 128
-    num_interpol_frames = 30
+    num_interpol_frames = round(video_frame_rate * zoom_speed)
 
     all_frames = []
     all_frames.append(current_image)
@@ -316,6 +317,15 @@ def on_ui_tabs():
                         minimum=1,
                         maximum=60,
                     )
+                    zoom_speed_slider = gr.Slider(
+                        label="Zoom Speed",
+                        value=1.0,
+                        minimum=0.1,
+                        maximum=20.0,
+                        step=0.1,
+                        info="Zoom speed in seconds (higher values create slower zoom)",
+                    )
+
                 with gr.Tab("Outpaint"):
                     inpainting_denoising_strength = gr.Slider(
                         label="Denoising Strength", minimum=0.75, maximum=1, value=1
@@ -364,6 +374,7 @@ def on_ui_tabs():
                 inpainting_fill_mode,
                 inpainting_full_res,
                 inpainting_padding,
+                zoom_speed_slider,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
