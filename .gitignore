@@ -129,6 +129,3 @@ dmypy.json
 .pyre/
 .vscode/settings.json
 .DS_Store
-
-# old code using hard coded out dir
-out/*
