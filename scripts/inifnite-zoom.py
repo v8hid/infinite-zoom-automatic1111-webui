@@ -248,6 +248,7 @@ def on_ui_tabs():
         """
         )
         generate_btn = gr.Button(value="Generate video", variant="primary")
+        interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
                 with gr.Tab("Main"):
@@ -376,7 +377,11 @@ def on_ui_tabs():
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
-
+        interrupt.click(
+            fn=lambda: shared.state.interrupt(),
+            inputs=[],
+            outputs=[]
+        )
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
 
