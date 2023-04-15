@@ -14,10 +14,10 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
         frames = frames[::-1]
 
     # Get dimensions of the frames
-    w, h = frames[0].size
+    # w, h = frames[0].size
 
-    # Create an imageio video writer
-    writer = imageio.get_writer(file_path, fps=fps)
+    # Create an imageio video writer, avoid block size of 512.
+    writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)
 
     # Duplicate the start and end frames
     start_frames = [frames[0]] * start_frame_dupe_amount
