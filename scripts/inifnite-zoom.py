@@ -20,7 +20,6 @@ from modules.processing import (
 
 from modules.ui import create_output_panel, plaintext_to_html
 
-output_path = basedir + "/extensions/infinite-zoom-automatic1111-webui/out"
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
 
@@ -106,6 +105,7 @@ def create_zoom(
     inpainting_full_res,
     inpainting_padding,
     zoom_speed,
+    outputsize
 ):
     prompts = {}
     for x in prompts_array:
@@ -117,8 +117,9 @@ def create_zoom(
             pass
     assert len(prompts_array) > 0, "prompts is empty"
 
-    width = 512
-    height = 512
+    width = outputsize
+    height = outputsize
+
     current_image = Image.new(mode="RGBA", size=(height, width))
     mask_image = np.array(current_image)[:, :, 3]
     mask_image = Image.fromarray(255 - mask_image).convert("RGB")
@@ -216,7 +217,8 @@ def create_zoom(
         all_frames.append(current_image)
 
     video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
-    save_path = os.path.join(output_path, "videos")
+    output_path = shared.opts.data.get("infzoom_outpath",shared.opts.data.get("outdir_img2img_samples"))
+    save_path = os.path.join(output_path, shared.opts.data.get("infzoom_outSUBpath","infinite-zooms"))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     out = os.path.join(save_path, video_file_name)
@@ -250,7 +252,9 @@ def on_ui_tabs():
         generate_btn = gr.Button(value="Generate video", variant="primary")
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
+               
                 with gr.Tab("Main"):
+                    outsize_slider = gr.Slider(minimum=512, maximum=2048,value=shared.opts.data.get("infzoom_outsize",512),step=8,label="Output size (square)")
                     outpaint_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint steps", "prompt"],
@@ -373,11 +377,25 @@ def on_ui_tabs():
                 inpainting_full_res,
                 inpainting_padding,
                 zoom_speed_slider,
+                outsize_slider
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
 
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
+def on_ui_settings():
+    section = ('infinite-zoom', "Infinite Zoom")
+
+    shared.opts.add_option("infzoom_outpath", shared.OptionInfo(
+        "", "Path where to store your infinite video. Let empty to use img2img-output", gr.Textbox, {"interactive": True}, section=section))
+
+    shared.opts.add_option("infzoom_outSUBpath", shared.OptionInfo(
+        "infinite-zooms", "Which subfolder name to be created in the outpath. Default is 'infinite-zooms'", gr.Textbox, {"interactive": True}, section=section))
+
+    shared.opts.add_option("infzoom_outsize", shared.OptionInfo(
+        512, "Default size for X and Y of your video", gr.Slider, {"minimum": 512, "maximum": 2048, "step": 8}, section=section))
+
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
+script_callbacks.on_ui_settings(on_ui_settings)
