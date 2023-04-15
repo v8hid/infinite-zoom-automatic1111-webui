@@ -61,7 +61,18 @@ https://user-images.githubusercontent.com/62482657/231574839-9d3aab52-7a87-4658-
 
 
  </details>
-  
+
+## Google colab notebook
+Generate infinite loop videos in minutes
+It works on free colab plan
+ 
+[GitHub Repo](https://github.com/v8hid/infinite-zoom-stable-diffusion)
+
+<a target="_blank" href="https://colab.research.google.com/github/v8hid/infinite-zoom-stable-diffusion/blob/main/infinite_zoom_gradio.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>  👈 Easy to use notebook 
+
+
 
 ## Contributing
 
