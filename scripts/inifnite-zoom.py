@@ -7,6 +7,7 @@ sys.path.extend(basedir + "/extensions/infinite-zoom-automatic1111-webui/")
 import numpy as np
 import gradio as gr
 from PIL import Image
+import math
 
 from iz_helpers import shrink_and_paste_on_blank, write_video
 from webui import wrap_gradio_gpu_call
@@ -140,7 +141,8 @@ def create_zoom(
             height,
         )
         current_image = processed.images[0]
-    mask_width = 128
+
+    mask_width = math.trunc(width/4)  # was initially 512px => 128px
     num_interpol_frames = round(video_frame_rate * zoom_speed)
 
     all_frames = []
@@ -250,6 +252,7 @@ def on_ui_tabs():
         """
         )
         generate_btn = gr.Button(value="Generate video", variant="primary")
+        interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
                
@@ -381,7 +384,11 @@ def on_ui_tabs():
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
-
+        interrupt.click(
+            fn=lambda: shared.state.interrupt(),
+            inputs=[],
+            outputs=[]
+        )
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
 def on_ui_settings():
