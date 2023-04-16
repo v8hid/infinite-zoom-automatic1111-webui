@@ -89,6 +89,15 @@ def renderImg2Img(
     return processed
 
 
+def fix_env_Path_ffprobe():
+    envpath = os.environ['PATH']
+    ffppath= shared.opts.data.get("infzoom_ffprobepath","")
+
+    if (ffppath and not ffppath in envpath):
+        path_sep = ';' if os.name == 'nt' else ':'
+        os.environ['PATH'] = envpath+path_sep+ffppath
+
+
 def create_zoom(
     prompts_array,
     negative_prompt,
@@ -108,6 +117,9 @@ def create_zoom(
     zoom_speed,
     outputsize
 ):
+    
+    fix_env_Path_ffprobe()
+
     prompts = {}
     for x in prompts_array:
         try:
@@ -403,6 +415,8 @@ def on_ui_settings():
     shared.opts.add_option("infzoom_outsize", shared.OptionInfo(
         512, "Default size for X and Y of your video", gr.Slider, {"minimum": 512, "maximum": 2048, "step": 8}, section=section))
 
+    shared.opts.add_option("infzoom_ffprobepath", shared.OptionInfo(
+        "", "Writing videos has  dependency to an existing FFPROBE executable on your machine. D/L here (https://github.com/BtbN/FFmpeg-Builds/releases) your OS variant and point to your installation path", gr.Textbox, {"interactive": True}, section=section))
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_settings(on_ui_settings)
