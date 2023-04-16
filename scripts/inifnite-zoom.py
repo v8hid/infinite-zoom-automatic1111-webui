@@ -281,8 +281,8 @@ def on_ui_tabs():
             with gr.Column(scale=1, variant="panel"):
                
                 with gr.Tab("Main"):
-                    outsizeW_slider = gr.Slider(minimum=64, maximum=2048,value=shared.opts.data.get("infzoom_outsizeW",512),step=16,label="Output Width")
-                    outsizeH_slider = gr.Slider(minimum=64, maximum=2048,value=shared.opts.data.get("infzoom_outsizeH",512),step=16,label="Output Height")
+                    outsizeW_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeW",512),step=16,label="Output Width")
+                    outsizeH_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeH",512),step=16,label="Output Height")
                     outpaint_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint steps", "prompt"],
@@ -405,8 +405,8 @@ def on_ui_tabs():
                 inpainting_full_res,
                 inpainting_padding,
                 zoom_speed_slider,
-                outsizeH_slider,
-                outsizeW_slider
+                outsizeW_slider,
+                outsizeH_slider
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
@@ -426,8 +426,11 @@ def on_ui_settings():
     shared.opts.add_option("infzoom_outSUBpath", shared.OptionInfo(
         "infinite-zooms", "Which subfolder name to be created in the outpath. Default is 'infinite-zooms'", gr.Textbox, {"interactive": True}, section=section))
 
-    shared.opts.add_option("infzoom_outsize", shared.OptionInfo(
-        512, "Default size for X and Y of your video", gr.Slider, {"minimum": 512, "maximum": 2048, "step": 8}, section=section))
+    shared.opts.add_option("infzoom_outsizeW", shared.OptionInfo(
+        512, "Default width of your video", gr.Slider, {"minimum": 16, "maximum": 2048, "step": 16}, section=section))
+
+    shared.opts.add_option("infzoom_outsizeH", shared.OptionInfo(
+        512, "Default height your video", gr.Slider, {"minimum": 16, "maximum": 2048, "step": 16}, section=section))
 
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
