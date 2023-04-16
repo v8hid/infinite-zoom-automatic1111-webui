@@ -115,7 +115,8 @@ def create_zoom(
     inpainting_full_res,
     inpainting_padding,
     zoom_speed,
-    outputsize
+    outputsizeW,
+    outputsizeH,
 ):
     
     fix_env_Path_ffprobe()
@@ -130,10 +131,10 @@ def create_zoom(
             pass
     assert len(prompts_array) > 0, "prompts is empty"
 
-    width = outputsize
-    height = outputsize
+    width = outputsizeW
+    height = outputsizeH
 
-    current_image = Image.new(mode="RGBA", size=(height, width))
+    current_image = Image.new(mode="RGBA", size=(width, height))
     mask_image = np.array(current_image)[:, :, 3]
     mask_image = Image.fromarray(255 - mask_image).convert("RGB")
     current_image = current_image.convert("RGB")
@@ -155,6 +156,8 @@ def create_zoom(
         current_image = processed.images[0]
 
     mask_width = math.trunc(width/4)  # was initially 512px => 128px
+    mask_height = math.trunc(height/4)  # was initially 512px => 128px
+
     num_interpol_frames = round(video_frame_rate * zoom_speed)
 
     all_frames = []
@@ -164,7 +167,7 @@ def create_zoom(
 
         prev_image_fix = current_image
 
-        prev_image = shrink_and_paste_on_blank(current_image, mask_width)
+        prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
 
         current_image = prev_image
 
@@ -197,34 +200,55 @@ def create_zoom(
         # interpolation steps bewteen 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             interpol_image = current_image
+
             interpol_width = round(
                 (
                     1
-                    - (1 - 2 * mask_width / height)
+                    - (1 - 2 * mask_width / width)
+                    ** (1 - (j + 1) / num_interpol_frames)
+                )
+                * width
+                / 2
+            )
+
+            interpol_height = round(
+                (
+                    1
+                    - (1 - 2 * mask_height / height)
                     ** (1 - (j + 1) / num_interpol_frames)
                 )
                 * height
                 / 2
             )
+
             interpol_image = interpol_image.crop(
                 (
                     interpol_width,
-                    interpol_width,
+                    interpol_height,
                     width - interpol_width,
-                    height - interpol_width,
+                    height - interpol_height,
                 )
             )
 
-            interpol_image = interpol_image.resize((height, width))
+            interpol_image = interpol_image.resize((width, height))
+
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
             interpol_width2 = round(
-                (1 - (height - 2 * mask_width) / (height - 2 * interpol_width))
+                (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
+                / 2
+                * width
+            )
+
+            interpol_height2 = round(
+                (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
                 / 2
                 * height
             )
+
             prev_image_fix_crop = shrink_and_paste_on_blank(
-                prev_image_fix, interpol_width2
+                prev_image_fix, interpol_width2, interpol_height2
             )
+
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
 
             all_frames.append(interpol_image)
@@ -269,7 +293,8 @@ def on_ui_tabs():
             with gr.Column(scale=1, variant="panel"):
                
                 with gr.Tab("Main"):
-                    outsize_slider = gr.Slider(minimum=512, maximum=2048,value=shared.opts.data.get("infzoom_outsize",512),step=8,label="Output size (square)")
+                    outsizeW_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeW",512),step=16,label="Output Width")
+                    outsizeH_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeH",512),step=16,label="Output Height")
                     outpaint_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint steps", "prompt"],
@@ -392,7 +417,8 @@ def on_ui_tabs():
                 inpainting_full_res,
                 inpainting_padding,
                 zoom_speed_slider,
-                outsize_slider
+                outsizeW_slider,
+                outsizeH_slider
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
@@ -412,8 +438,11 @@ def on_ui_settings():
     shared.opts.add_option("infzoom_outSUBpath", shared.OptionInfo(
         "infinite-zooms", "Which subfolder name to be created in the outpath. Default is 'infinite-zooms'", gr.Textbox, {"interactive": True}, section=section))
 
-    shared.opts.add_option("infzoom_outsize", shared.OptionInfo(
-        512, "Default size for X and Y of your video", gr.Slider, {"minimum": 512, "maximum": 2048, "step": 8}, section=section))
+    shared.opts.add_option("infzoom_outsizeW", shared.OptionInfo(
+        512, "Default width of your video", gr.Slider, {"minimum": 16, "maximum": 2048, "step": 16}, section=section))
+
+    shared.opts.add_option("infzoom_outsizeH", shared.OptionInfo(
+        512, "Default height your video", gr.Slider, {"minimum": 16, "maximum": 2048, "step": 16}, section=section))
 
     shared.opts.add_option("infzoom_ffprobepath", shared.OptionInfo(
         "", "Writing videos has  dependency to an existing FFPROBE executable on your machine. D/L here (https://github.com/BtbN/FFmpeg-Builds/releases) your OS variant and point to your installation path", gr.Textbox, {"interactive": True}, section=section))

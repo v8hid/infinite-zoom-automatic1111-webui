@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 
 
-def shrink_and_paste_on_blank(current_image, mask_width):
+def shrink_and_paste_on_blank(current_image, mask_width, mask_height):
     """
     Decreases size of current_image by mask_width pixels from each side,
     then adds a mask_width width transparent frame, 
@@ -17,7 +17,7 @@ def shrink_and_paste_on_blank(current_image, mask_width):
 
     # shrink down by mask_width
     prev_image = current_image.resize(
-        (height-2*mask_width, width-2*mask_width))
+        (width-2*mask_width, height-2*mask_height))
     prev_image = prev_image.convert("RGBA")
     prev_image = np.array(prev_image)
 
@@ -26,8 +26,7 @@ def shrink_and_paste_on_blank(current_image, mask_width):
     blank_image[:, :, 3] = 1
 
     # paste shrinked onto blank
-    blank_image[mask_width:height-mask_width,
-                mask_width:width-mask_width, :] = prev_image
+    blank_image[mask_height:height-mask_height,mask_width:width-mask_width  :] = prev_image
     prev_image = Image.fromarray(blank_image)
 
     return prev_image
