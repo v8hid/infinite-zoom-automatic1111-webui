@@ -1,0 +1,4 @@
+#tab_iz_interface .gradio-dataframe .controls-wrap {
+    flex-direction: row-reverse;
+    justify-content: space-between;
+}
