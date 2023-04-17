@@ -8,6 +8,7 @@ import numpy as np
 import gradio as gr
 from PIL import Image
 import math
+import json
 
 from iz_helpers import shrink_and_paste_on_blank, write_video
 from webui import wrap_gradio_gpu_call
@@ -278,6 +279,17 @@ def create_zoom(
     )
 
 
+def exportPrompts(p,np):
+    print("prompts:" + str(p) +"\n"+str(np))
+
+def putPrompts(files):
+    file_paths = [file.name for file in files]
+    with open(files.name, 'r') as f:
+        file_contents = f.read()
+        data = json.loads(file_contents)
+        print(data)
+    return [gr.DataFrame.update(data["prompts"]), gr.Textbox.update(data["negPrompt"])]
+
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as infinite_zoom_interface:
         gr.HTML(
@@ -308,6 +320,12 @@ def on_ui_tabs():
                     outpaint_negative_prompt = gr.Textbox(
                         value=default_negative_prompt, label="Negative Prompt"
                     )
+
+                    # these button will be moved using JS unde the dataframe view as small ones
+                    exportPrompts_button= gr.Button(value="Export prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_exP_butt")
+                    importPrompts_button= gr.UploadButton(value="Import prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_imP_butt")
+                    exportPrompts_button.click(None,_js="exportPrompts",inputs=[outpaint_prompts,outpaint_negative_prompt],outputs=None)
+                    importPrompts_button.upload(fn=putPrompts,outputs=[outpaint_prompts,outpaint_negative_prompt], inputs=[importPrompts_button])
 
                     outpaint_steps = gr.Slider(
                         minimum=2,
