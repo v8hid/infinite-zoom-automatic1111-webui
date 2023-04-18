@@ -45,12 +45,14 @@ available_samplers = [
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
 
+
 def closest_upper_divisible_by_eight(num):
     if num % 8 == 0:
         return num
     else:
-        return math.ceil(num/8)*8
-    
+        return math.ceil(num / 8) * 8
+
+
 def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
     processed = None
     p = StableDiffusionProcessingTxt2Img(
@@ -574,6 +576,7 @@ def on_ui_tabs():
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
         interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
+    infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
 
