@@ -45,7 +45,12 @@ available_samplers = [
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
 
-
+def closest_upper_divisible_by_eight(num):
+    if num % 8 == 0:
+        return num
+    else:
+        return math.ceil(num/8)*8
+    
 def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
     processed = None
     p = StableDiffusionProcessingTxt2Img(
@@ -204,8 +209,8 @@ def create_zoom_single(
             pass
     assert len(prompts_array) > 0, "prompts is empty"
 
-    width = outputsizeW
-    height = outputsizeH
+    width = closest_upper_divisible_by_eight(outputsizeW)
+    height = closest_upper_divisible_by_eight(outputsizeH)
 
     current_image = Image.new(mode="RGBA", size=(width, height))
     mask_image = np.array(current_image)[:, :, 3]
@@ -376,10 +381,12 @@ def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as infinite_zoom_interface:
         gr.HTML(
             """
-        <p style='text-align: center'>
-        Text to Video - Infinite zoom effect
-        </p>
-        """
+            <p style="text-align: center;">
+                <a target="_blank" href="https://github.com/v8hid/infinite-zoom-automatic1111-webui"><img src="https://img.shields.io/static/v1?label=github&message=repository&color=blue&style=flat&logo=github&logoColor=white" style="display: inline;" alt="GitHub Repo"/></a>
+                <a href="https://discord.gg/v2nHqSrWdW"><img src="https://img.shields.io/discord/1095469311830806630?color=blue&label=discord&logo=discord&logoColor=white" style="display: inline;" alt="Discord server"></a>
+            </p>
+
+            """
         )
         generate_btn = gr.Button(value="Generate video", variant="primary")
         interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
