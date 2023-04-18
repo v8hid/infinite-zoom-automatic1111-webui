@@ -407,8 +407,8 @@ def on_ui_tabs():
                         info="The more it is, the longer your videos will be",
                     )
                     main_rotate_per_step = gr.Slider(
-                        minimum=-360,
-                        maximum=360,
+                        minimum=-180,
+                        maximum=180,
                         step=1,
                         value=0,
                         label="Rotation (degrees per step)",
