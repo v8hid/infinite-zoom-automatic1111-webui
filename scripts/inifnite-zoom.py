@@ -22,6 +22,26 @@ from modules.processing import (
 
 from modules.ui import create_output_panel, plaintext_to_html
 
+available_samplers = [
+    "DDIM",
+    "Euler a",
+    "Euler",
+    "LMS",
+    "Heun",
+    "DPM2",
+    "DPM2 a",
+    "DPM++ 2S a",
+    "DPM++ 2M",
+    "DPM++ SDE",
+    "DPM fast",
+    "DPM adaptive",
+    "LMS Karras",
+    "DPM2 Karras",
+    "DPM2 a Karras",
+    "DPM++ 2S a Karras",
+    "DPM++ 2M Karras",
+    "DPM++ SDE Karras",
+]
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
 
@@ -119,6 +139,7 @@ def create_zoom(
     outputsizeW,
     outputsizeH,
     batchcount,
+    sampler,
     progress=gr.Progress(),
 ):
     for i in range(batchcount):
@@ -142,6 +163,7 @@ def create_zoom(
             zoom_speed,
             outputsizeW,
             outputsizeH,
+            sampler,
             progress,
         )
     return result
@@ -166,6 +188,7 @@ def create_zoom_single(
     zoom_speed,
     outputsizeW,
     outputsizeH,
+    sampler,
     progress=gr.Progress(),
 ):
     fix_env_Path_ffprobe()
@@ -197,7 +220,7 @@ def create_zoom_single(
         processed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
             negative_prompt,
-            "Euler a",
+            sampler,
             num_inference_steps,
             guidance_scale,
             width,
@@ -234,7 +257,7 @@ def create_zoom_single(
         processed = renderImg2Img(
             prompts[max(k for k in prompts.keys() if k <= i)],
             negative_prompt,
-            "Euler a",
+            sampler,
             num_inference_steps,
             guidance_scale,
             width,
@@ -363,23 +386,17 @@ def on_ui_tabs():
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
                 with gr.Tab("Main"):
-                    outsizeW_slider = gr.Slider(
-                        minimum=16,
-                        maximum=2048,
-                        value=shared.opts.data.get("infzoom_outsizeW", 512),
-                        step=16,
-                        label="Output Width",
+                    main_outpaint_steps = gr.Slider(
+                        minimum=2,
+                        maximum=100,
+                        step=1,
+                        value=8,
+                        label="Total Outpaint Steps",
+                        info="The more it is, the longer your videos will be",
                     )
-                    outsizeH_slider = gr.Slider(
-                        minimum=16,
-                        maximum=2048,
-                        value=shared.opts.data.get("infzoom_outsizeH", 512),
-                        step=16,
-                        label="Output Height",
-                    )
-                    outpaint_prompts = gr.Dataframe(
+                    main_prompts = gr.Dataframe(
                         type="array",
-                        headers=["outpaint steps", "prompt"],
+                        headers=["outpaint step", "prompt"],
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),
@@ -387,7 +404,7 @@ def on_ui_tabs():
                         wrap=True,
                     )
 
-                    outpaint_negative_prompt = gr.Textbox(
+                    main_negative_prompt = gr.Textbox(
                         value=default_negative_prompt, label="Negative Prompt"
                     )
 
@@ -407,39 +424,50 @@ def on_ui_tabs():
                     exportPrompts_button.click(
                         None,
                         _js="exportPrompts",
-                        inputs=[outpaint_prompts, outpaint_negative_prompt],
+                        inputs=[main_prompts, main_negative_prompt],
                         outputs=None,
                     )
                     importPrompts_button.upload(
                         fn=putPrompts,
-                        outputs=[outpaint_prompts, outpaint_negative_prompt],
+                        outputs=[main_prompts, main_negative_prompt],
                         inputs=[importPrompts_button],
                     )
-
-                    outpaint_steps = gr.Slider(
-                        minimum=2,
-                        maximum=100,
-                        step=1,
-                        value=8,
-                        label="Total Outpaint Steps",
-                        info="The more it is, the longer your videos will be",
+                    main_sampler = gr.Dropdown(
+                        label="Sampler",
+                        choices=available_samplers,
+                        value="Euler a",
+                        type="value",
                     )
-
-                    guidance_scale = gr.Slider(
-                        minimum=0.1,
-                        maximum=15,
-                        step=0.1,
-                        value=7,
-                        label="Guidance Scale",
-                    )
-
-                    sampling_step = gr.Slider(
-                        minimum=1,
-                        maximum=100,
-                        step=1,
-                        value=50,
-                        label="Sampling Steps for each outpaint",
-                    )
+                    with gr.Row():
+                        main_width = gr.Slider(
+                            minimum=16,
+                            maximum=2048,
+                            value=shared.opts.data.get("infzoom_outsizeW", 512),
+                            step=16,
+                            label="Output Width",
+                        )
+                        main_height = gr.Slider(
+                            minimum=16,
+                            maximum=2048,
+                            value=shared.opts.data.get("infzoom_outsizeH", 512),
+                            step=16,
+                            label="Output Height",
+                        )
+                    with gr.Row():
+                        main_guidance_scale = gr.Slider(
+                            minimum=0.1,
+                            maximum=15,
+                            step=0.1,
+                            value=7,
+                            label="Guidance Scale",
+                        )
+                        sampling_step = gr.Slider(
+                            minimum=1,
+                            maximum=100,
+                            step=1,
+                            value=50,
+                            label="Sampling Steps for each outpaint",
+                        )
                     init_image = gr.Image(type="pil", label="custom initial image")
                     batchcount_slider = gr.Slider(
                         minimum=1,
@@ -475,7 +503,7 @@ def on_ui_tabs():
                         minimum=1,
                         maximum=60,
                     )
-                    zoom_speed_slider = gr.Slider(
+                    video_zoom_speed = gr.Slider(
                         label="Zoom Speed",
                         value=1.0,
                         minimum=0.1,
@@ -515,10 +543,10 @@ def on_ui_tabs():
         generate_btn.click(
             fn=create_zoom,
             inputs=[
-                outpaint_prompts,
-                outpaint_negative_prompt,
-                outpaint_steps,
-                guidance_scale,
+                main_prompts,
+                main_negative_prompt,
+                main_outpaint_steps,
+                main_guidance_scale,
                 sampling_step,
                 init_image,
                 video_frame_rate,
@@ -530,10 +558,11 @@ def on_ui_tabs():
                 inpainting_fill_mode,
                 inpainting_full_res,
                 inpainting_padding,
-                zoom_speed_slider,
-                outsizeW_slider,
-                outsizeH_slider,
+                video_zoom_speed,
+                main_width,
+                main_height,
                 batchcount_slider,
+                main_sampler,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
