@@ -118,6 +118,52 @@ def create_zoom(
     zoom_speed,
     outputsizeW,
     outputsizeH,
+    batchcount,
+):
+    for i in range(batchcount):
+        print(f"Batch {i+1}/{batchcount}")
+        result = create_zoom_single(
+            prompts_array,
+            negative_prompt,
+            num_outpainting_steps,
+            guidance_scale,
+            num_inference_steps,
+            custom_init_image,
+            video_frame_rate,
+            video_zoom_mode,
+            video_start_frame_dupe_amount,
+            video_last_frame_dupe_amount,
+            inpainting_denoising_strength,
+            inpainting_mask_blur,
+            inpainting_fill_mode,
+            inpainting_full_res,
+            inpainting_padding,
+            zoom_speed,
+            outputsizeW,
+            outputsizeH
+        )
+    return result
+
+
+def create_zoom_single(
+    prompts_array,
+    negative_prompt,
+    num_outpainting_steps,
+    guidance_scale,
+    num_inference_steps,
+    custom_init_image,
+    video_frame_rate,
+    video_zoom_mode,
+    video_start_frame_dupe_amount,
+    video_last_frame_dupe_amount,
+    inpainting_denoising_strength,
+    inpainting_mask_blur,
+    inpainting_fill_mode,
+    inpainting_full_res,
+    inpainting_padding,
+    zoom_speed,
+    outputsizeW,
+    outputsizeH
 ):
     
     fix_env_Path_ffprobe()
@@ -198,7 +244,7 @@ def create_zoom(
 
         current_image.paste(prev_image, mask=prev_image)
 
-        # interpolation steps bewteen 2 inpainted images (=sequential zoom and crop)
+        # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             interpol_image = current_image
 
@@ -352,6 +398,7 @@ def on_ui_tabs():
                         label="Sampling Steps for each outpaint",
                     )
                     init_image = gr.Image(type="pil", label="custom initial image")
+                    batchcount_slider = gr.Slider(minimum=1, maximum=25,value=shared.opts.data.get("infzoom_batchcount",1),step=1,label="Batch Count")
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
@@ -436,7 +483,8 @@ def on_ui_tabs():
                 inpainting_padding,
                 zoom_speed_slider,
                 outsizeW_slider,
-                outsizeH_slider
+                outsizeH_slider,
+                batchcount_slider,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
