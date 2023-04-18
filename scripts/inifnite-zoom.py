@@ -21,6 +21,7 @@ from modules.processing import (
 )
 
 from modules.ui import create_output_panel, plaintext_to_html
+import modules.sd_models
 
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
@@ -28,6 +29,7 @@ default_negative_prompt = "frames, borderline, text, character, duplicate, error
 
 def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
     processed = None
+    
     p = StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
         outpath_samples=shared.opts.outdir_txt2img_samples,
@@ -63,6 +65,7 @@ def renderImg2Img(
     inpainting_padding,
 ):
     processed = None
+
     p = StableDiffusionProcessingImg2Img(
         sd_model=shared.sd_model,
         outpath_samples=shared.opts.outdir_img2img_samples,
@@ -118,6 +121,7 @@ def create_zoom(
     zoom_speed,
     outputsizeW,
     outputsizeH,
+    custom_exit_image
 ):
     
     fix_env_Path_ffprobe()
@@ -145,6 +149,13 @@ def create_zoom(
             (width, height), resample=Image.LANCZOS
         )
     else:
+
+        # switch to txt2img model
+        checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_txt2img_model")]
+        if (not checkinfo):
+            raise NameError("Checklist not found in registry")
+        modules.sd_models.load_model(checkinfo)
+
         processed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
             negative_prompt,
@@ -163,6 +174,13 @@ def create_zoom(
 
     all_frames = []
     all_frames.append(current_image)
+
+    # switch to inpaint model now
+    checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_inpainting_model", "sd-v1-5-inpainting.ckpt")]
+    if (not checkinfo):
+        raise NameError("Checklist not found in registry")
+    modules.sd_models.load_model(checkinfo)
+
     for i in range(num_outpainting_steps):
         print("Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps))
 
@@ -278,17 +296,15 @@ def create_zoom(
         plaintext_to_html(""),
     )
 
-
-def exportPrompts(p,np):
-    print("prompts:" + str(p) +"\n"+str(np))
-
 def putPrompts(files):
-    file_paths = [file.name for file in files]
     with open(files.name, 'r') as f:
         file_contents = f.read()
         data = json.loads(file_contents)
-        print(data)
     return [gr.DataFrame.update(data["prompts"]), gr.Textbox.update(data["negPrompt"])]
+
+def clearPrompts():
+    return [gr.DataFrame.update(value=[[0,"Infinite Zoom. Start over"]]), gr.Textbox.update("")]
+
 
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as infinite_zoom_interface:
@@ -313,12 +329,12 @@ def on_ui_tabs():
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),
-                        value=[[0, default_prompt]],
+                        value=[shared.opts.data.get("infzoom_defPrompt",default_prompt)],
                         wrap=True,
                     )
 
                     outpaint_negative_prompt = gr.Textbox(
-                        value=default_negative_prompt, label="Negative Prompt"
+                        value=shared.opts.data.get("infzoom_defNegPrompt",default_negative_prompt), label="Negative Prompt"
                     )
 
                     # these button will be moved using JS unde the dataframe view as small ones
@@ -326,6 +342,9 @@ def on_ui_tabs():
                     importPrompts_button= gr.UploadButton(value="Import prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_imP_butt")
                     exportPrompts_button.click(None,_js="exportPrompts",inputs=[outpaint_prompts,outpaint_negative_prompt],outputs=None)
                     importPrompts_button.upload(fn=putPrompts,outputs=[outpaint_prompts,outpaint_negative_prompt], inputs=[importPrompts_button])
+
+                    clearPrompts_button= gr.Button(value="Clear prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_clP_butt")
+                    clearPrompts_button.click(fn=clearPrompts,inputs=[],outputs=[outpaint_prompts,outpaint_negative_prompt])
 
                     outpaint_steps = gr.Slider(
                         minimum=2,
@@ -352,6 +371,7 @@ def on_ui_tabs():
                         label="Sampling Steps for each outpaint",
                     )
                     init_image = gr.Image(type="pil", label="custom initial image")
+                    exit_image = gr.Image(type="pil", label="custom exit image")
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
@@ -436,7 +456,8 @@ def on_ui_tabs():
                 inpainting_padding,
                 zoom_speed_slider,
                 outsizeW_slider,
-                outsizeH_slider
+                outsizeH_slider,
+                exit_image
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
@@ -464,6 +485,18 @@ def on_ui_settings():
 
     shared.opts.add_option("infzoom_ffprobepath", shared.OptionInfo(
         "", "Writing videos has  dependency to an existing FFPROBE executable on your machine. D/L here (https://github.com/BtbN/FFmpeg-Builds/releases) your OS variant and point to your installation path", gr.Textbox, {"interactive": True}, section=section))
+
+    shared.opts.add_option("infzoom_txt2img_model", shared.OptionInfo(
+        "", "Name of your desired model to render keyframes (txt2img), if empty current model used", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
+    
+    shared.opts.add_option("infzoom_inpainting_model", shared.OptionInfo(
+        "sd-v1-5-inpainting.ckpt", "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
+
+    shared.opts.add_option("infzoom_defPrompt", shared.OptionInfo(
+        default_prompt, "Default prompt to start with'", gr.TextArea, {"interactive": True}, section=section))
+    
+    shared.opts.add_option("infzoom_defNegPrompt", shared.OptionInfo(
+        default_negative_prompt, "Default negative prompt to start with'", gr.TextArea, {"interactive": True}, section=section))
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_settings(on_ui_settings)
