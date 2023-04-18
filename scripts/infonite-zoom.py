@@ -20,18 +20,41 @@ from modules.processing import (
     StableDiffusionProcessingImg2Img,
 )
 
-import scripts.postprocessing_upscale
-
 from modules.ui import create_output_panel, plaintext_to_html
-import modules.sd_models
 
+available_samplers = [
+    "DDIM",
+    "Euler a",
+    "Euler",
+    "LMS",
+    "Heun",
+    "DPM2",
+    "DPM2 a",
+    "DPM++ 2S a",
+    "DPM++ 2M",
+    "DPM++ SDE",
+    "DPM fast",
+    "DPM adaptive",
+    "LMS Karras",
+    "DPM2 Karras",
+    "DPM2 a Karras",
+    "DPM++ 2S a Karras",
+    "DPM++ 2M Karras",
+    "DPM++ SDE Karras",
+]
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
 
 
+def closest_upper_divisible_by_eight(num):
+    if num % 8 == 0:
+        return num
+    else:
+        return math.ceil(num / 8) * 8
+
+
 def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
     processed = None
-    
     p = StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
         outpath_samples=shared.opts.outdir_txt2img_samples,
@@ -47,14 +70,6 @@ def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, hei
         height=height,
     )
     processed = process_images(p)
-
-    curImg = processed.images[0]
-    pp= scripts.postprocessing_upscale.scripts_postprocessing.PostprocessedImage(curImg,{})
-    ups = scripts.postprocessing_upscale.ScriptPostprocessingUpscale()
-    ups.process(pp, upscale_mode=1, upscale_by=2.0, upscale_to_width=None, upscale_to_height=None, upscale_crop=False, upscaler_1_name="4x-UltraSharp", upscaler_2_name=None, upscaler_2_visibility=0.0)
-    processed.images[0]=pp.image
-
-
     return processed
 
 
@@ -75,7 +90,6 @@ def renderImg2Img(
     inpainting_padding,
 ):
     processed = None
-
     p = StableDiffusionProcessingImg2Img(
         sd_model=shared.sd_model,
         outpath_samples=shared.opts.outdir_img2img_samples,
@@ -104,12 +118,12 @@ def renderImg2Img(
 
 
 def fix_env_Path_ffprobe():
-    envpath = os.environ['PATH']
-    ffppath= shared.opts.data.get("infzoom_ffprobepath","")
+    envpath = os.environ["PATH"]
+    ffppath = shared.opts.data.get("infzoom_ffprobepath", "")
 
-    if (ffppath and not ffppath in envpath):
-        path_sep = ';' if os.name == 'nt' else ':'
-        os.environ['PATH'] = envpath+path_sep+ffppath
+    if ffppath and not ffppath in envpath:
+        path_sep = ";" if os.name == "nt" else ":"
+        os.environ["PATH"] = envpath + path_sep + ffppath
 
 
 def create_zoom(
@@ -131,10 +145,61 @@ def create_zoom(
     zoom_speed,
     outputsizeW,
     outputsizeH,
-    custom_exit_image
+    batchcount,
+    sampler,
+    progress=gr.Progress(),
 ):
-    
+    for i in range(batchcount):
+        print(f"Batch {i+1}/{batchcount}")
+        result = create_zoom_single(
+            prompts_array,
+            negative_prompt,
+            num_outpainting_steps,
+            guidance_scale,
+            num_inference_steps,
+            custom_init_image,
+            video_frame_rate,
+            video_zoom_mode,
+            video_start_frame_dupe_amount,
+            video_last_frame_dupe_amount,
+            inpainting_denoising_strength,
+            inpainting_mask_blur,
+            inpainting_fill_mode,
+            inpainting_full_res,
+            inpainting_padding,
+            zoom_speed,
+            outputsizeW,
+            outputsizeH,
+            sampler,
+            progress,
+        )
+    return result
+
+
+def create_zoom_single(
+    prompts_array,
+    negative_prompt,
+    num_outpainting_steps,
+    guidance_scale,
+    num_inference_steps,
+    custom_init_image,
+    video_frame_rate,
+    video_zoom_mode,
+    video_start_frame_dupe_amount,
+    video_last_frame_dupe_amount,
+    inpainting_denoising_strength,
+    inpainting_mask_blur,
+    inpainting_fill_mode,
+    inpainting_full_res,
+    inpainting_padding,
+    zoom_speed,
+    outputsizeW,
+    outputsizeH,
+    sampler,
+    progress=gr.Progress(),
+):
     fix_env_Path_ffprobe()
+    progress(0, desc="Preparing Initial Image")
 
     prompts = {}
     for x in prompts_array:
@@ -146,8 +211,8 @@ def create_zoom(
             pass
     assert len(prompts_array) > 0, "prompts is empty"
 
-    width = outputsizeW
-    height = outputsizeH
+    width = closest_upper_divisible_by_eight(outputsizeW)
+    height = closest_upper_divisible_by_eight(outputsizeH)
 
     current_image = Image.new(mode="RGBA", size=(width, height))
     mask_image = np.array(current_image)[:, :, 3]
@@ -159,17 +224,10 @@ def create_zoom(
             (width, height), resample=Image.LANCZOS
         )
     else:
-
-        # switch to txt2img model
-        checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_txt2img_model")]
-        if (not checkinfo):
-            raise NameError("Checklist not found in registry")
-        modules.sd_models.load_model(checkinfo)
-
         processed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
             negative_prompt,
-            "Euler a",
+            sampler,
             num_inference_steps,
             guidance_scale,
             width,
@@ -177,23 +235,20 @@ def create_zoom(
         )
         current_image = processed.images[0]
 
-    mask_width = math.trunc(width/4)  # was initially 512px => 128px
-    mask_height = math.trunc(height/4)  # was initially 512px => 128px
+    mask_width = math.trunc(width / 4)  # was initially 512px => 128px
+    mask_height = math.trunc(height / 4)  # was initially 512px => 128px
 
     num_interpol_frames = round(video_frame_rate * zoom_speed)
 
     all_frames = []
     all_frames.append(current_image)
-
-    # switch to inpaint model now
-    checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_inpainting_model", "sd-v1-5-inpainting.ckpt")]
-    if (not checkinfo):
-        raise NameError("Checklist not found in registry")
-    modules.sd_models.load_model(checkinfo)
-
     for i in range(num_outpainting_steps):
-        print("Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps))
-
+        print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
+        print(print_out)
+        progress(
+            ((i + 1) / num_outpainting_steps),
+            desc=print_out,
+        )
         prev_image_fix = current_image
 
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
@@ -209,7 +264,7 @@ def create_zoom(
         processed = renderImg2Img(
             prompts[max(k for k in prompts.keys() if k <= i)],
             negative_prompt,
-            "Euler a",
+            sampler,
             num_inference_steps,
             guidance_scale,
             width,
@@ -226,7 +281,7 @@ def create_zoom(
 
         current_image.paste(prev_image, mask=prev_image)
 
-        # interpolation steps bewteen 2 inpainted images (=sequential zoom and crop)
+        # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             interpol_image = current_image
 
@@ -284,8 +339,12 @@ def create_zoom(
         all_frames.append(current_image)
 
     video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
-    output_path = shared.opts.data.get("infzoom_outpath",shared.opts.data.get("outdir_img2img_samples"))
-    save_path = os.path.join(output_path, shared.opts.data.get("infzoom_outSUBpath","infinite-zooms"))
+    output_path = shared.opts.data.get(
+        "infzoom_outpath", shared.opts.data.get("outdir_img2img_samples")
+    )
+    save_path = os.path.join(
+        output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
+    )
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     out = os.path.join(save_path, video_file_name)
@@ -306,57 +365,37 @@ def create_zoom(
         plaintext_to_html(""),
     )
 
+
+def exportPrompts(p, np):
+    print("prompts:" + str(p) + "\n" + str(np))
+
+
 def putPrompts(files):
-    with open(files.name, 'r') as f:
+    file_paths = [file.name for file in files]
+    with open(files.name, "r") as f:
         file_contents = f.read()
         data = json.loads(file_contents)
+        print(data)
     return [gr.DataFrame.update(data["prompts"]), gr.Textbox.update(data["negPrompt"])]
-
-def clearPrompts():
-    return [gr.DataFrame.update(value=[[0,"Infinite Zoom. Start over"]]), gr.Textbox.update("")]
 
 
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as infinite_zoom_interface:
         gr.HTML(
             """
-        <p style='text-align: center'>
-        Text to Video - Infinite zoom effect
-        </p>
-        """
+            <p style="text-align: center;">
+                <a target="_blank" href="https://github.com/v8hid/infinite-zoom-automatic1111-webui"><img src="https://img.shields.io/static/v1?label=github&message=repository&color=blue&style=flat&logo=github&logoColor=white" style="display: inline;" alt="GitHub Repo"/></a>
+                <a href="https://discord.gg/v2nHqSrWdW"><img src="https://img.shields.io/discord/1095469311830806630?color=blue&label=discord&logo=discord&logoColor=white" style="display: inline;" alt="Discord server"></a>
+            </p>
+
+            """
         )
         generate_btn = gr.Button(value="Generate video", variant="primary")
         interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
-               
                 with gr.Tab("Main"):
-                    outsizeW_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeW",512),step=16,label="Output Width")
-                    outsizeH_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeH",512),step=16,label="Output Height")
-                    outpaint_prompts = gr.Dataframe(
-                        type="array",
-                        headers=["outpaint steps", "prompt"],
-                        datatype=["number", "str"],
-                        row_count=1,
-                        col_count=(2, "fixed"),
-                        value=[shared.opts.data.get("infzoom_defPrompt",default_prompt)],
-                        wrap=True,
-                    )
-
-                    outpaint_negative_prompt = gr.Textbox(
-                        value=shared.opts.data.get("infzoom_defNegPrompt",default_negative_prompt), label="Negative Prompt"
-                    )
-
-                    # these button will be moved using JS unde the dataframe view as small ones
-                    exportPrompts_button= gr.Button(value="Export prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_exP_butt")
-                    importPrompts_button= gr.UploadButton(value="Import prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_imP_butt")
-                    exportPrompts_button.click(None,_js="exportPrompts",inputs=[outpaint_prompts,outpaint_negative_prompt],outputs=None)
-                    importPrompts_button.upload(fn=putPrompts,outputs=[outpaint_prompts,outpaint_negative_prompt], inputs=[importPrompts_button])
-
-                    clearPrompts_button= gr.Button(value="Clear prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_clP_butt")
-                    clearPrompts_button.click(fn=clearPrompts,inputs=[],outputs=[outpaint_prompts,outpaint_negative_prompt])
-
-                    outpaint_steps = gr.Slider(
+                    main_outpaint_steps = gr.Slider(
                         minimum=2,
                         maximum=100,
                         step=1,
@@ -364,24 +403,88 @@ def on_ui_tabs():
                         label="Total Outpaint Steps",
                         info="The more it is, the longer your videos will be",
                     )
-
-                    guidance_scale = gr.Slider(
-                        minimum=0.1,
-                        maximum=15,
-                        step=0.1,
-                        value=7,
-                        label="Guidance Scale",
+                    main_prompts = gr.Dataframe(
+                        type="array",
+                        headers=["outpaint step", "prompt"],
+                        datatype=["number", "str"],
+                        row_count=1,
+                        col_count=(2, "fixed"),
+                        value=[[0, default_prompt]],
+                        wrap=True,
                     )
 
-                    sampling_step = gr.Slider(
-                        minimum=1,
-                        maximum=100,
-                        step=1,
-                        value=50,
-                        label="Sampling Steps for each outpaint",
+                    main_negative_prompt = gr.Textbox(
+                        value=default_negative_prompt, label="Negative Prompt"
                     )
+
+                    # these button will be moved using JS unde the dataframe view as small ones
+                    exportPrompts_button = gr.Button(
+                        value="Export prompts",
+                        variant="secondary",
+                        elem_classes="sm infzoom_tab_butt",
+                        elem_id="infzoom_exP_butt",
+                    )
+                    importPrompts_button = gr.UploadButton(
+                        value="Import prompts",
+                        variant="secondary",
+                        elem_classes="sm infzoom_tab_butt",
+                        elem_id="infzoom_imP_butt",
+                    )
+                    exportPrompts_button.click(
+                        None,
+                        _js="exportPrompts",
+                        inputs=[main_prompts, main_negative_prompt],
+                        outputs=None,
+                    )
+                    importPrompts_button.upload(
+                        fn=putPrompts,
+                        outputs=[main_prompts, main_negative_prompt],
+                        inputs=[importPrompts_button],
+                    )
+                    main_sampler = gr.Dropdown(
+                        label="Sampler",
+                        choices=available_samplers,
+                        value="Euler a",
+                        type="value",
+                    )
+                    with gr.Row():
+                        main_width = gr.Slider(
+                            minimum=16,
+                            maximum=2048,
+                            value=shared.opts.data.get("infzoom_outsizeW", 512),
+                            step=16,
+                            label="Output Width",
+                        )
+                        main_height = gr.Slider(
+                            minimum=16,
+                            maximum=2048,
+                            value=shared.opts.data.get("infzoom_outsizeH", 512),
+                            step=16,
+                            label="Output Height",
+                        )
+                    with gr.Row():
+                        main_guidance_scale = gr.Slider(
+                            minimum=0.1,
+                            maximum=15,
+                            step=0.1,
+                            value=7,
+                            label="Guidance Scale",
+                        )
+                        sampling_step = gr.Slider(
+                            minimum=1,
+                            maximum=100,
+                            step=1,
+                            value=50,
+                            label="Sampling Steps for each outpaint",
+                        )
                     init_image = gr.Image(type="pil", label="custom initial image")
-                    exit_image = gr.Image(type="pil", label="custom exit image")
+                    batchcount_slider = gr.Slider(
+                        minimum=1,
+                        maximum=25,
+                        value=shared.opts.data.get("infzoom_batchcount", 1),
+                        step=1,
+                        label="Batch Count",
+                    )
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
@@ -409,7 +512,7 @@ def on_ui_tabs():
                         minimum=1,
                         maximum=60,
                     )
-                    zoom_speed_slider = gr.Slider(
+                    video_zoom_speed = gr.Slider(
                         label="Zoom Speed",
                         value=1.0,
                         minimum=0.1,
@@ -447,12 +550,12 @@ def on_ui_tabs():
                     "infinit-zoom", shared.opts.outdir_img2img_samples
                 )
         generate_btn.click(
-            fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
+            fn=create_zoom,
             inputs=[
-                outpaint_prompts,
-                outpaint_negative_prompt,
-                outpaint_steps,
-                guidance_scale,
+                main_prompts,
+                main_negative_prompt,
+                main_outpaint_steps,
+                main_guidance_scale,
                 sampling_step,
                 init_image,
                 video_frame_rate,
@@ -464,49 +567,77 @@ def on_ui_tabs():
                 inpainting_fill_mode,
                 inpainting_full_res,
                 inpainting_padding,
-                zoom_speed_slider,
-                outsizeW_slider,
-                outsizeH_slider,
-                exit_image
+                video_zoom_speed,
+                main_width,
+                main_height,
+                batchcount_slider,
+                main_sampler,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
-        interrupt.click(
-            fn=lambda: shared.state.interrupt(),
-            inputs=[],
-            outputs=[]
-        )
+        interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
+    infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
+
 def on_ui_settings():
-    section = ('infinite-zoom', "Infinite Zoom")
+    section = ("infinite-zoom", "Infinite Zoom")
 
-    shared.opts.add_option("infzoom_outpath", shared.OptionInfo(
-        "", "Path where to store your infinite video. Let empty to use img2img-output", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option(
+        "infzoom_outpath",
+        shared.OptionInfo(
+            "",
+            "Path where to store your infinite video. Let empty to use img2img-output",
+            gr.Textbox,
+            {"interactive": True},
+            section=section,
+        ),
+    )
 
-    shared.opts.add_option("infzoom_outSUBpath", shared.OptionInfo(
-        "infinite-zooms", "Which subfolder name to be created in the outpath. Default is 'infinite-zooms'", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option(
+        "infzoom_outSUBpath",
+        shared.OptionInfo(
+            "infinite-zooms",
+            "Which subfolder name to be created in the outpath. Default is 'infinite-zooms'",
+            gr.Textbox,
+            {"interactive": True},
+            section=section,
+        ),
+    )
 
-    shared.opts.add_option("infzoom_outsizeW", shared.OptionInfo(
-        512, "Default width of your video", gr.Slider, {"minimum": 16, "maximum": 2048, "step": 16}, section=section))
+    shared.opts.add_option(
+        "infzoom_outsizeW",
+        shared.OptionInfo(
+            512,
+            "Default width of your video",
+            gr.Slider,
+            {"minimum": 16, "maximum": 2048, "step": 16},
+            section=section,
+        ),
+    )
 
-    shared.opts.add_option("infzoom_outsizeH", shared.OptionInfo(
-        512, "Default height your video", gr.Slider, {"minimum": 16, "maximum": 2048, "step": 16}, section=section))
+    shared.opts.add_option(
+        "infzoom_outsizeH",
+        shared.OptionInfo(
+            512,
+            "Default height your video",
+            gr.Slider,
+            {"minimum": 16, "maximum": 2048, "step": 16},
+            section=section,
+        ),
+    )
 
-    shared.opts.add_option("infzoom_ffprobepath", shared.OptionInfo(
-        "", "Writing videos has  dependency to an existing FFPROBE executable on your machine. D/L here (https://github.com/BtbN/FFmpeg-Builds/releases) your OS variant and point to your installation path", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option(
+        "infzoom_ffprobepath",
+        shared.OptionInfo(
+            "",
+            "Writing videos has  dependency to an existing FFPROBE executable on your machine. D/L here (https://github.com/BtbN/FFmpeg-Builds/releases) your OS variant and point to your installation path",
+            gr.Textbox,
+            {"interactive": True},
+            section=section,
+        ),
+    )
 
-    shared.opts.add_option("infzoom_txt2img_model", shared.OptionInfo(
-        "", "Name of your desired model to render keyframes (txt2img), if empty current model used", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
-    
-    shared.opts.add_option("infzoom_inpainting_model", shared.OptionInfo(
-        "sd-v1-5-inpainting.ckpt", "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
-
-    shared.opts.add_option("infzoom_defPrompt", shared.OptionInfo(
-        default_prompt, "Default prompt to start with'", gr.TextArea, {"interactive": True}, section=section))
-    
-    shared.opts.add_option("infzoom_defNegPrompt", shared.OptionInfo(
-        default_negative_prompt, "Default negative prompt to start with'", gr.TextArea, {"interactive": True}, section=section))
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_settings(on_ui_settings)
