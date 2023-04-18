@@ -339,7 +339,6 @@ def on_ui_tabs():
             with gr.Column(scale=1, variant="panel"):
                
                 with gr.Tab("Main"):
-                    batchcount_slider = gr.Slider(minimum=1, maximum=25,value=shared.opts.data.get("infzoom_batchcount",1),step=1,label="Batch Count")
                     outsizeW_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeW",512),step=16,label="Output Width")
                     outsizeH_slider = gr.Slider(minimum=16, maximum=2048,value=shared.opts.data.get("infzoom_outsizeH",512),step=16,label="Output Height")
                     outpaint_prompts = gr.Dataframe(
@@ -381,6 +380,7 @@ def on_ui_tabs():
                         label="Sampling Steps for each outpaint",
                     )
                     init_image = gr.Image(type="pil", label="custom initial image")
+                    batchcount_slider = gr.Slider(minimum=1, maximum=25,value=shared.opts.data.get("infzoom_batchcount",1),step=1,label="Batch Count")
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
