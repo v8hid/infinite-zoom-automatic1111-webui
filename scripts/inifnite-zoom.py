@@ -20,6 +20,8 @@ from modules.processing import (
     StableDiffusionProcessingImg2Img,
 )
 
+import scripts.postprocessing_upscale
+
 from modules.ui import create_output_panel, plaintext_to_html
 import modules.sd_models
 
@@ -45,6 +47,14 @@ def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, hei
         height=height,
     )
     processed = process_images(p)
+
+    curImg = processed.images[0]
+    pp= scripts.postprocessing_upscale.scripts_postprocessing.PostprocessedImage(curImg,{})
+    ups = scripts.postprocessing_upscale.ScriptPostprocessingUpscale()
+    ups.process(pp, upscale_mode=1, upscale_by=2.0, upscale_to_width=None, upscale_to_height=None, upscale_crop=False, upscaler_1_name="4x-UltraSharp", upscaler_2_name=None, upscaler_2_visibility=0.0)
+    processed.images[0]=pp.image
+
+
     return processed
 
 
