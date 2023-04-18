@@ -147,7 +147,7 @@ def create_zoom(
     outputsizeH,
     batchcount,
     sampler,
-    progress=gr.Progress(),
+    progress=None,
 ):
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
@@ -196,10 +196,15 @@ def create_zoom_single(
     outputsizeW,
     outputsizeH,
     sampler,
-    progress=gr.Progress(),
+    progress=None,
 ):
+    # try:
+    #     if gr.Progress() is not None:
+    #         progress = gr.Progress()
+    #         progress(0, desc="Preparing Initial Image")
+    # except Exception:
+    #     pass
     fix_env_Path_ffprobe()
-    progress(0, desc="Preparing Initial Image")
 
     prompts = {}
     for x in prompts_array:
@@ -245,10 +250,11 @@ def create_zoom_single(
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
         print(print_out)
-        progress(
-            ((i + 1) / num_outpainting_steps),
-            desc=print_out,
-        )
+        # if progress is not None:
+        #     progress(
+        #         ((i + 1) / num_outpainting_steps),
+        #         desc=print_out,
+        #     )
         prev_image_fix = current_image
 
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
