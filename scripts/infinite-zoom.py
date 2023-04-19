@@ -556,7 +556,7 @@ def on_ui_tabs():
                     "infinit-zoom", shared.opts.outdir_img2img_samples
                 )
         generate_btn.click(
-            fn=create_zoom,
+            fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, '', '']),
             inputs=[
                 main_prompts,
                 main_negative_prompt,
