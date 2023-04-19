@@ -10,7 +10,7 @@ from PIL import Image
 import math
 import json
 
-from iz_helpers import shrink_rotate_and_paste_on_blank, write_video
+from iz_helpers import shrink_and_paste_on_blank, write_video
 from webui import wrap_gradio_gpu_call
 from modules import script_callbacks
 import modules.shared as shared
@@ -45,12 +45,14 @@ available_samplers = [
 default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
 default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
 
+
 def closest_upper_divisible_by_eight(num):
     if num % 8 == 0:
         return num
     else:
-        return math.ceil(num/8)*8
-    
+        return math.ceil(num / 8) * 8
+
+
 def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
     processed = None
     p = StableDiffusionProcessingTxt2Img(
@@ -145,8 +147,7 @@ def create_zoom(
     outputsizeH,
     batchcount,
     sampler,
-    rotate_angle,
-    progress=gr.Progress(),
+    progress=None,
 ):
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
@@ -170,7 +171,6 @@ def create_zoom(
             outputsizeW,
             outputsizeH,
             sampler,
-            rotate_angle,
             progress,
         )
     return result
@@ -196,11 +196,15 @@ def create_zoom_single(
     outputsizeW,
     outputsizeH,
     sampler,
-    rotate_angle,
-    progress=gr.Progress(),
+    progress=None,
 ):
+    # try:
+    #     if gr.Progress() is not None:
+    #         progress = gr.Progress()
+    #         progress(0, desc="Preparing Initial Image")
+    # except Exception:
+    #     pass
     fix_env_Path_ffprobe()
-    progress(0, desc="Preparing Initial Image")
 
     prompts = {}
     for x in prompts_array:
@@ -246,13 +250,14 @@ def create_zoom_single(
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
         print(print_out)
-        progress(
-            ((i + 1) / num_outpainting_steps),
-            desc=print_out,
-        )
+        # if progress is not None:
+        #     progress(
+        #         ((i + 1) / num_outpainting_steps),
+        #         desc=print_out,
+        #     )
         prev_image_fix = current_image
 
-        prev_image = shrink_rotate_and_paste_on_blank(current_image, mask_width, mask_height, rotate_angle=rotate_angle)
+        prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
 
         current_image = prev_image
 
@@ -330,12 +335,10 @@ def create_zoom_single(
                 * height
             )
 
-
-            
-            prev_image_fix_crop = shrink_rotate_and_paste_on_blank(
-                prev_image_fix, interpol_width2, interpol_height2, rotate_angle*(j+1)/num_interpol_frames
+            prev_image_fix_crop = shrink_and_paste_on_blank(
+                prev_image_fix, interpol_width2, interpol_height2
             )
-            interpol_image = interpol_image.rotate(-rotate_angle*(1-(j+1)/num_interpol_frames), resample=Image.BICUBIC)
+
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
 
             all_frames.append(interpol_image)
@@ -405,14 +408,6 @@ def on_ui_tabs():
                         value=8,
                         label="Total Outpaint Steps",
                         info="The more it is, the longer your videos will be",
-                    )
-                    main_rotate_per_step = gr.Slider(
-                        minimum=-180,
-                        maximum=180,
-                        step=1,
-                        value=0,
-                        label="Rotation (degrees per step)",
-                        info="The more it is, the faster your videos will be rotating between inpainting steps. Negative values for counterclockwise rotation.",
                     )
                     main_prompts = gr.Dataframe(
                         type="array",
@@ -561,7 +556,7 @@ def on_ui_tabs():
                     "infinit-zoom", shared.opts.outdir_img2img_samples
                 )
         generate_btn.click(
-            fn=create_zoom,
+            fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, '', '']),
             inputs=[
                 main_prompts,
                 main_negative_prompt,
@@ -583,11 +578,11 @@ def on_ui_tabs():
                 main_height,
                 batchcount_slider,
                 main_sampler,
-                main_rotate_per_step,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
         interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
+    infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
 
