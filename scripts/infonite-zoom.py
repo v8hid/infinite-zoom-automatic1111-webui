@@ -20,37 +20,28 @@ from modules.processing import (
     StableDiffusionProcessingImg2Img,
 )
 
+import scripts.postprocessing_upscale
+
 from modules.ui import create_output_panel, plaintext_to_html
+import modules.sd_models
+import modules.sd_samplers
 
-available_samplers = [
-    "DDIM",
-    "Euler a",
-    "Euler",
-    "LMS",
-    "Heun",
-    "DPM2",
-    "DPM2 a",
-    "DPM++ 2S a",
-    "DPM++ 2M",
-    "DPM++ SDE",
-    "DPM fast",
-    "DPM adaptive",
-    "LMS Karras",
-    "DPM2 Karras",
-    "DPM2 a Karras",
-    "DPM++ 2S a Karras",
-    "DPM++ 2M Karras",
-    "DPM++ SDE Karras",
-]
-default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
-default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
+available_samplers = [s.name for s in modules.sd_samplers.samplers]
 
+default_prompt = {"prompts":{"data":[[0,"Cat"],["1","Dog"],["2","Happy Pets"]],"headers":["outpaint steps","prompt"]},"negPrompt":"ugly"}
 
 def closest_upper_divisible_by_eight(num):
     if num % 8 == 0:
         return num
     else:
         return math.ceil(num / 8) * 8
+
+def do_upscaleImg(curImg,upscale_do, upscaler_name,upscale_by):
+    if (not upscale_do): return curImg
+    pp= scripts.postprocessing_upscale.scripts_postprocessing.PostprocessedImage(curImg)
+    ups = scripts.postprocessing_upscale.ScriptPostprocessingUpscale()
+    ups.process(pp, upscale_mode=2, upscale_by=upscale_by, upscale_to_width=None, upscale_to_height=None, upscale_crop=False, upscaler_1_name=upscaler_name, upscaler_2_name=None, upscaler_2_visibility=0.0)
+    return pp.image
 
 
 def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
@@ -72,7 +63,6 @@ def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, hei
     processed = process_images(p)
     return processed
 
-
 def renderImg2Img(
     prompt,
     negative_prompt,
@@ -90,6 +80,7 @@ def renderImg2Img(
     inpainting_padding,
 ):
     processed = None
+
     p = StableDiffusionProcessingImg2Img(
         sd_model=shared.sd_model,
         outpath_samples=shared.opts.outdir_img2img_samples,
@@ -133,6 +124,7 @@ def create_zoom(
     guidance_scale,
     num_inference_steps,
     custom_init_image,
+    custom_exit_image,
     video_frame_rate,
     video_zoom_mode,
     video_start_frame_dupe_amount,
@@ -147,6 +139,9 @@ def create_zoom(
     outputsizeH,
     batchcount,
     sampler,
+    upscale_do,
+    upscaler_name,
+    upscale_by,
     progress=gr.Progress(),
 ):
     for i in range(batchcount):
@@ -158,6 +153,7 @@ def create_zoom(
             guidance_scale,
             num_inference_steps,
             custom_init_image,
+            custom_exit_image,
             video_frame_rate,
             video_zoom_mode,
             video_start_frame_dupe_amount,
@@ -171,7 +167,11 @@ def create_zoom(
             outputsizeW,
             outputsizeH,
             sampler,
+            upscale_do,
+            upscaler_name,
+            upscale_by,
             progress,
+
         )
     return result
 
@@ -183,6 +183,7 @@ def create_zoom_single(
     guidance_scale,
     num_inference_steps,
     custom_init_image,
+    custom_exit_image,
     video_frame_rate,
     video_zoom_mode,
     video_start_frame_dupe_amount,
@@ -196,6 +197,9 @@ def create_zoom_single(
     outputsizeW,
     outputsizeH,
     sampler,
+    upscale_do,
+    upscaler_name,
+    upscale_by,
     progress=gr.Progress(),
 ):
     fix_env_Path_ffprobe()
@@ -224,6 +228,13 @@ def create_zoom_single(
             (width, height), resample=Image.LANCZOS
         )
     else:
+        # switch to txt2img model
+        checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_txt2img_model")]
+        if (not checkinfo):
+            raise NameError("Checklist not found in registry")
+        progress(0, desc="Loading Model for txt2img: " + checkinfo.name)
+        modules.sd_models.load_model(checkinfo)
+
         processed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
             negative_prompt,
@@ -235,13 +246,27 @@ def create_zoom_single(
         )
         current_image = processed.images[0]
 
+
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
 
     num_interpol_frames = round(video_frame_rate * zoom_speed)
 
     all_frames = []
-    all_frames.append(current_image)
+
+
+    if upscale_do:
+        progress(0,desc="upscaling inital image")
+
+    all_frames.append(do_upscaleImg(current_image,upscale_do, upscaler_name,upscale_by) if upscale_do else current_image)
+
+    # switch to inpaint model now
+    checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_inpainting_model", "sd-v1-5-inpainting.ckpt")]
+    if (not checkinfo):
+        raise NameError("Checklist not found in registry")
+    progress(0, desc="Loading Model for inpainting/img2img: " + checkinfo.name)
+    modules.sd_models.load_model(checkinfo)
+
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
         print(print_out)
@@ -261,6 +286,7 @@ def create_zoom_single(
 
         # inpainting step
         current_image = current_image.convert("RGB")
+
         processed = renderImg2Img(
             prompts[max(k for k in prompts.keys() if k <= i)],
             negative_prompt,
@@ -335,8 +361,21 @@ def create_zoom_single(
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
 
-            all_frames.append(interpol_image)
-        all_frames.append(current_image)
+            if upscale_do:
+                progress(
+                    ((i + 1) / num_outpainting_steps),
+                    desc="upscaling interpol",
+                )
+            all_frames.append(do_upscaleImg(interpol_image, upscale_do, upscaler_name,upscale_by) if upscale_do else current_image)
+
+
+        if (upscale_do):
+            progress(
+                ((i + 1) / num_outpainting_steps),
+                desc="upscaling current",
+            )
+
+        all_frames.append(do_upscaleImg(current_image,upscale_do, upscaler_name,upscale_by) if upscale_do else current_image)
 
     video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
     output_path = shared.opts.data.get(
@@ -365,18 +404,14 @@ def create_zoom_single(
         plaintext_to_html(""),
     )
 
-
-def exportPrompts(p, np):
-    print("prompts:" + str(p) + "\n" + str(np))
-
-
 def putPrompts(files):
-    file_paths = [file.name for file in files]
-    with open(files.name, "r") as f:
+    with open(files.name, 'r') as f:
         file_contents = f.read()
         data = json.loads(file_contents)
-        print(data)
     return [gr.DataFrame.update(data["prompts"]), gr.Textbox.update(data["negPrompt"])]
+
+def clearPrompts():
+    return [gr.DataFrame.update(value=[[0,"Infinite Zoom. Start over"]]), gr.Textbox.update("")]
 
 
 def on_ui_tabs():
@@ -390,10 +425,12 @@ def on_ui_tabs():
 
             """
         )
-        generate_btn = gr.Button(value="Generate video", variant="primary")
-        interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
+        with gr.Row():
+            generate_btn = gr.Button(value="Generate video", variant="primary")
+            interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
+               
                 with gr.Tab("Main"):
                     main_outpaint_steps = gr.Slider(
                         minimum=2,
@@ -409,12 +446,12 @@ def on_ui_tabs():
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),
-                        value=[[0, default_prompt]],
+                        value=json.loads(shared.opts.data.get("infzoom_defPrompt",default_prompt))["prompts"],
                         wrap=True,
                     )
 
                     main_negative_prompt = gr.Textbox(
-                        value=default_negative_prompt, label="Negative Prompt"
+                        value=json.loads(shared.opts.data.get("infzoom_defPrompt",default_prompt))["negPrompt"], label="Negative Prompt"                    
                     )
 
                     # these button will be moved using JS unde the dataframe view as small ones
@@ -441,6 +478,10 @@ def on_ui_tabs():
                         outputs=[main_prompts, main_negative_prompt],
                         inputs=[importPrompts_button],
                     )
+
+                    clearPrompts_button= gr.Button(value="Clear prompts",variant="secondary",elem_classes="sm infzoom_tab_butt", elem_id="infzoom_clP_butt")
+                    clearPrompts_button.click(fn=clearPrompts,inputs=[],outputs=[main_prompts,main_negative_prompt])
+
                     main_sampler = gr.Dropdown(
                         label="Sampler",
                         choices=available_samplers,
@@ -477,7 +518,10 @@ def on_ui_tabs():
                             value=50,
                             label="Sampling Steps for each outpaint",
                         )
-                    init_image = gr.Image(type="pil", label="custom initial image")
+                    with gr.Row():
+                        init_image = gr.Image(type="pil", label="custom initial image")
+                        exit_image = gr.Image(type="pil", label="custom exit image", visible=False) #TODO: implement exit-image rendering
+
                     batchcount_slider = gr.Slider(
                         minimum=1,
                         maximum=25,
@@ -539,6 +583,19 @@ def on_ui_tabs():
                         label="masked padding", minimum=0, maximum=256, value=0
                     )
 
+                with gr.Tab("Post proccess"):
+                    upscale_do = gr.Checkbox(False, label="Enable Upscale")
+                    upscaler_name = gr.Dropdown(label='Upscaler', elem_id="infZ_upscaler", choices=[x.name for x in shared.sd_upscalers], value=shared.sd_upscalers[0].name)
+
+                    upscale_by = gr.Slider(
+                        label="Upscale by factor", minimum=1, maximum=8, value=1
+                    )
+                    with gr.Accordion("Help",open=False):
+                        gr.Markdown("""# Performance critical
+Depending on amount of frames and which upscaler you choose it might took a long time to render.  
+Our best experience and trade-off is the R-ERSGAn4x upscaler.
+""")
+
             with gr.Column(scale=1, variant="compact"):
                 output_video = gr.Video(label="Output").style(width=512, height=512)
                 (
@@ -558,6 +615,7 @@ def on_ui_tabs():
                 main_guidance_scale,
                 sampling_step,
                 init_image,
+                exit_image,
                 video_frame_rate,
                 video_zoom_mode,
                 video_start_frame_dupe_amount,
@@ -572,6 +630,10 @@ def on_ui_tabs():
                 main_height,
                 batchcount_slider,
                 main_sampler,
+                upscale_do,
+                upscaler_name,
+                upscale_by
+
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
@@ -638,6 +700,15 @@ def on_ui_settings():
         ),
     )
 
+    shared.opts.add_option("infzoom_txt2img_model", shared.OptionInfo(
+        "", "Name of your desired model to render keyframes (txt2img), if empty current model used", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
+    
+    shared.opts.add_option("infzoom_inpainting_model", shared.OptionInfo(
+        "sd-v1-5-inpainting.ckpt", "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
+
+    shared.opts.add_option("infzoom_defPrompt", shared.OptionInfo(
+        default_prompt, "Default prompt-setup to start with'", gr.Code, {"interactive": True, "language":"json"}, section=section))
+    
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_settings(on_ui_settings)
