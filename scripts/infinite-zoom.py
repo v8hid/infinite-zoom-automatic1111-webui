@@ -28,7 +28,11 @@ import modules.sd_samplers
 
 available_samplers = [s.name for s in modules.sd_samplers.samplers]
 
-default_prompt = json.loads('{"prompts":{"data":[[0,"Cat"],["1","Dog"],["2","Happy Pets"]],"headers":["outpaint steps","prompt"]},"negPrompt":"ugly"}')
+default_prompt = '{"prompts":{"data":[[0,"Cat"],["1","Dog"],["2","Happy Pets"]],"headers":["outpaint steps","prompt"]},"negPrompt":"ugly"}'
+empty_prompt = '{"prompts":{"data":[],"headers":["outpaint steps","prompt"]},"negPrompt":""}'
+
+#must be python dict
+invalid_prompt ={"prompts":{"data":[[0,"Your prompt-json is invalid, please check Settings"]],"headers":["outpaint steps","prompt"]},"negPrompt":"Invalid prompt-json"}
 
 def closest_upper_divisible_by_eight(num):
     if num % 8 == 0:
@@ -237,7 +241,7 @@ def create_zoom_single(
         checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_txt2img_model")]
         if (not checkinfo):
             raise NameError("Checklist not found in registry")
-        progress(0, desc="Loading Model for txt2img: " + checkinfo.name)
+        if progress: progress(0, desc="Loading Model for txt2img: " + checkinfo.name)
         modules.sd_models.load_model(checkinfo)
 
         processed = renderTxt2Img(
@@ -260,8 +264,8 @@ def create_zoom_single(
     all_frames = []
 
 
-    if upscale_do:
-        progress(0,desc="upscaling inital image")
+    if upscale_do and progress:
+        progress(0, desc="upscaling inital image")
 
     all_frames.append(do_upscaleImg(current_image,upscale_do, upscaler_name,upscale_by) if upscale_do else current_image)
 
@@ -269,21 +273,16 @@ def create_zoom_single(
     checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_inpainting_model", "sd-v1-5-inpainting.ckpt")]
     if (not checkinfo):
         raise NameError("Checklist not found in registry")
-    progress(0, desc="Loading Model for inpainting/img2img: " + checkinfo.name)
+    if progress: progress(0, desc="Loading Model for inpainting/img2img: " + checkinfo.name)
     modules.sd_models.load_model(checkinfo)
 
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
         print(print_out)
-        # if progress is not None:
-        #     progress(
-        #         ((i + 1) / num_outpainting_steps),
-        #         desc=print_out,
-        #     )
+        if progress: progress( ((i + 1) / num_outpainting_steps), desc=print_out)
+
         prev_image_fix = current_image
-
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
-
         current_image = prev_image
 
         # create mask (black image with white mask_width width edges)
@@ -367,18 +366,18 @@ def create_zoom_single(
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
 
-            if upscale_do:
+            if upscale_do and progress: 
                 progress(
                     ((i + 1) / num_outpainting_steps),
-                    desc="upscaling interpol",
+                    desc="upscaling interpol"
                 )
+
             all_frames.append(do_upscaleImg(interpol_image, upscale_do, upscaler_name,upscale_by) if upscale_do else interpol_image)
 
-
-        if (upscale_do):
+        if upscale_do and progress:
             progress(
                 ((i + 1) / num_outpainting_steps),
-                desc="upscaling current",
+                desc="upscaling current"
             )
 
         all_frames.append(do_upscaleImg(current_image,upscale_do, upscaler_name,upscale_by) if upscale_do else current_image)
@@ -446,18 +445,28 @@ def on_ui_tabs():
                         label="Total Outpaint Steps",
                         info="The more it is, the longer your videos will be",
                     )
+
+                    # safe reading json prompt
+                    pr = shared.opts.data.get("infzoom_defPrompt",default_prompt)
+                    if (not pr): pr = empty_prompt
+
+                    try:
+                        jpr = json.loads(pr)
+                    except Exception:
+                        jpr = invalid_prompt
+
                     main_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint step", "prompt"],
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),
-                        value=json.loads(shared.opts.data.get("infzoom_defPrompt",default_prompt))["prompts"],
+                        value=jpr["prompts"],
                         wrap=True,
                     )
 
                     main_negative_prompt = gr.Textbox(
-                        value=json.loads(shared.opts.data.get("infzoom_defPrompt",default_prompt))["negPrompt"], label="Negative Prompt"                    
+                        value=jpr["negPrompt"], label="Negative Prompt"                    
                     )
 
                     # these button will be moved using JS unde the dataframe view as small ones
@@ -731,7 +740,7 @@ def on_ui_settings():
     shared.opts.add_option(
         "infzoom_defPrompt", 
         shared.OptionInfo(
-            "", 
+            default_prompt, 
             "Default prompt-setup to start with'", 
             gr.Code, 
             {"interactive": True, "language":"json"}, 
