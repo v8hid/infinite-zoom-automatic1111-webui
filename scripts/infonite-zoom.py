@@ -28,7 +28,7 @@ import modules.sd_samplers
 
 available_samplers = [s.name for s in modules.sd_samplers.samplers]
 
-default_prompt = {"prompts":{"data":[[0,"Cat"],["1","Dog"],["2","Happy Pets"]],"headers":["outpaint steps","prompt"]},"negPrompt":"ugly"}
+default_prompt = json.loads('{"prompts":{"data":[[0,"Cat"],["1","Dog"],["2","Happy Pets"]],"headers":["outpaint steps","prompt"]},"negPrompt":"ugly"}')
 
 def closest_upper_divisible_by_eight(num):
     if num % 8 == 0:
@@ -366,7 +366,7 @@ def create_zoom_single(
                     ((i + 1) / num_outpainting_steps),
                     desc="upscaling interpol",
                 )
-            all_frames.append(do_upscaleImg(interpol_image, upscale_do, upscaler_name,upscale_by) if upscale_do else current_image)
+            all_frames.append(do_upscaleImg(interpol_image, upscale_do, upscaler_name,upscale_by) if upscale_do else interpol_image)
 
 
         if (upscale_do):
@@ -604,7 +604,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                     html_info,
                     html_log,
                 ) = create_output_panel(
-                    "infinit-zoom", shared.opts.outdir_img2img_samples
+                    "infinite-zoom", shared.opts.outdir_img2img_samples
                 )
         generate_btn.click(
             fn=create_zoom,
@@ -696,19 +696,42 @@ def on_ui_settings():
             "Writing videos has  dependency to an existing FFPROBE executable on your machine. D/L here (https://github.com/BtbN/FFmpeg-Builds/releases) your OS variant and point to your installation path",
             gr.Textbox,
             {"interactive": True},
-            section=section,
-        ),
+            section=section
+        )
     )
 
-    shared.opts.add_option("infzoom_txt2img_model", shared.OptionInfo(
-        "", "Name of your desired model to render keyframes (txt2img), if empty current model used", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
+    shared.opts.add_option(
+        "infzoom_txt2img_model", 
+        shared.OptionInfo(
+            "", 
+            "Name of your desired model to render keyframes (txt2img), if empty current model used", 
+            gr.Dropdown, 
+            lambda: {"choices": shared.list_checkpoint_tiles()},
+            section=section
+        )
+    )
     
-    shared.opts.add_option("infzoom_inpainting_model", shared.OptionInfo(
-        "sd-v1-5-inpainting.ckpt", "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ", gr.Dropdown, lambda: {"choices": shared.list_checkpoint_tiles()}, section=section))
+    shared.opts.add_option(
+        "infzoom_inpainting_model", 
+        shared.OptionInfo(
+            "sd-v1-5-inpainting.ckpt", 
+            "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ", 
+            gr.Dropdown, 
+            lambda: {"choices": shared.list_checkpoint_tiles()}, 
+            section=section
+        )
+    )
 
-    shared.opts.add_option("infzoom_defPrompt", shared.OptionInfo(
-        default_prompt, "Default prompt-setup to start with'", gr.Code, {"interactive": True, "language":"json"}, section=section))
+    shared.opts.add_option(
+        "infzoom_defPrompt", 
+        shared.OptionInfo(
+            "", 
+            "Default prompt-setup to start with'", 
+            gr.Code, 
+            {"interactive": True, "language":"json"}, 
+            section=section
+        )
+    )
     
-
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_settings(on_ui_settings)
