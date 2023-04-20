@@ -429,6 +429,7 @@ def putPrompts(files):
         
     except Exception:
         gr.Error("loading your prompt failed. It seems to be invalid. Your prompt table is preserved.")
+        print("[InfiniteZoom:] Loading your prompt failed. It seems to be invalid. Your prompt table is preserved.")
         return [gr.DataFrame.update(), gr.Textbox.update()]
 
 def clearPrompts():
