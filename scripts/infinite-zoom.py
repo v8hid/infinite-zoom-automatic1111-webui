@@ -154,12 +154,25 @@ def fix_env_Path_ffprobe():
         os.environ["PATH"] = envpath + path_sep + ffppath
 
 
-def load_model_from_setting(model_field_name):
+def load_model_from_setting(model_field_name, progress, progress_desc):
+    # fix typo in Automatic1111 vs Vlad111
+    if hasattr(modules.sd_models, "checkpoint_alisases"):
+        checkPList = modules.sd_models.checkpoint_alisases
+    if hasattr(modules.sd_models, "checkpoint_aliases"):
+        checkPList = modules.sd_models.checkpoint_aliases
+    else:
+        raise Exception("This is not a compatible StableDiffusion Platform, can not access checkpoints")
+    
     model_name = shared.opts.data.get(model_field_name)
     if model_name is not None and model_name != "":
-        checkinfo = modules.sd_models.checkpoint_alisases[model_name]
+        checkinfo = checkPList[model_name]
+
         if not checkinfo:
             raise NameError(model_field_name + " Does not exist in your models.")
+
+        if progress: 
+            progress(0, desc=progress_desc + checkinfo.name)
+
         modules.sd_models.load_model(checkinfo)
 
 
@@ -278,9 +291,7 @@ def create_zoom_single(
             (width, height), resample=Image.LANCZOS
         )
     else:
-        load_model_from_setting("infzoom_txt2img_model")
-        if progress:
-            progress(0, desc="Loading Model for txt2img: " + checkinfo.name)
+        load_model_from_setting("infzoom_txt2img_model", progress, "Loading Model for txt2img: ")
 
         processed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
@@ -309,9 +320,7 @@ def create_zoom_single(
         else current_image
     )
 
-    load_model_from_setting("infzoom_inpainting_model")
-    if progress:
-        progress(0, desc="Loading Model for inpainting/img2img: " + checkinfo.name)
+    load_model_from_setting("infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: " )
 
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
