@@ -171,7 +171,7 @@ def load_model_from_setting(model_field_name, progress, progress_desc):
     # fix typo in Automatic1111 vs Vlad111
     if hasattr(modules.sd_models, "checkpoint_alisases"):
         checkPList = modules.sd_models.checkpoint_alisases
-    if hasattr(modules.sd_models, "checkpoint_aliases"):
+    elif hasattr(modules.sd_models, "checkpoint_aliases"):
         checkPList = modules.sd_models.checkpoint_aliases
     else:
         raise Exception("This is not a compatible StableDiffusion Platform, can not access checkpoints")
