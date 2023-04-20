@@ -20,7 +20,7 @@ from modules.processing import (
     StableDiffusionProcessingImg2Img,
 )
 
-import scripts.postprocessing_upscale
+from scripts import postprocessing_upscale
 
 from modules.ui import create_output_panel, plaintext_to_html
 import modules.sd_models
@@ -75,10 +75,10 @@ def closest_upper_divisible_by_eight(num):
 def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
     if not upscale_do:
         return curImg
-    pp = scripts.postprocessing_upscale.scripts_postprocessing.PostprocessedImage(
+    pp = postprocessing_upscale.scripts_postprocessing.PostprocessedImage(
         curImg
     )
-    ups = scripts.postprocessing_upscale.ScriptPostprocessingUpscale()
+    ups = postprocessing_upscale.ScriptPostprocessingUpscale()
     ups.process(
         pp,
         upscale_mode=2,
@@ -565,7 +565,7 @@ def on_ui_tabs():
                         elem_id="infzoom_exP_butt",
                     )
                     importPrompts_button = gr.UploadButton(
-                        value="Import prompts",
+                        label="Import prompts",
                         variant="secondary",
                         elem_classes="sm infzoom_tab_butt",
                         elem_id="infzoom_imP_butt",
