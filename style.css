@@ -2,3 +2,8 @@
     flex-direction: row-reverse;
     justify-content: space-between;
 }
+
+/* first column min width */
+#tab_iz_interface  th {
+    width: 0;
+}

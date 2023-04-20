@@ -740,7 +740,7 @@ def on_ui_settings():
     shared.opts.add_option(
         "infzoom_txt2img_model", 
         shared.OptionInfo(
-            shared.list_checkpoint_tiles[0], 
+            None, 
             "Name of your desired model to render keyframes (txt2img)", 
             gr.Dropdown, 
             lambda: {"choices": shared.list_checkpoint_tiles()},
@@ -751,7 +751,7 @@ def on_ui_settings():
     shared.opts.add_option(
         "infzoom_inpainting_model", 
         shared.OptionInfo(
-            "sd-v1-5-inpainting.ckpt", 
+            None, 
             "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ", 
             gr.Dropdown, 
             lambda: {"choices": shared.list_checkpoint_tiles()}, 
