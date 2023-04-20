@@ -10,7 +10,7 @@ from PIL import Image
 import math
 import json
 
-from iz_helpers import shrink_and_paste_on_blank, write_video
+from iz_helpers import shrink_rotate_and_paste_on_blank, zoom_image, write_video
 from webui import wrap_gradio_gpu_call
 from modules import script_callbacks
 import modules.shared as shared
@@ -147,7 +147,8 @@ def create_zoom(
     outputsizeH,
     batchcount,
     sampler,
-    progress=None,
+    rotate_angle,
+    progress=gr.Progress(),
 ):
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
@@ -171,6 +172,7 @@ def create_zoom(
             outputsizeW,
             outputsizeH,
             sampler,
+            rotate_angle,
             progress,
         )
     return result
@@ -196,15 +198,11 @@ def create_zoom_single(
     outputsizeW,
     outputsizeH,
     sampler,
-    progress=None,
+    rotate_angle,
+    progress=gr.Progress(),
 ):
-    # try:
-    #     if gr.Progress() is not None:
-    #         progress = gr.Progress()
-    #         progress(0, desc="Preparing Initial Image")
-    # except Exception:
-    #     pass
     fix_env_Path_ffprobe()
+    progress(0, desc="Preparing Initial Image")
 
     prompts = {}
     for x in prompts_array:
@@ -243,21 +241,19 @@ def create_zoom_single(
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
 
-    num_interpol_frames = round(video_frame_rate * zoom_speed)
+    
 
-    all_frames = []
-    all_frames.append(current_image)
+    all_images = []
+    all_images.append(current_image)
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
         print(print_out)
-        # if progress is not None:
-        #     progress(
-        #         ((i + 1) / num_outpainting_steps),
-        #         desc=print_out,
-        #     )
-        prev_image_fix = current_image
+        progress(
+            ((i + 1) / num_outpainting_steps),
+            desc=print_out,
+        )
 
-        prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
+        prev_image = shrink_rotate_and_paste_on_blank(current_image, mask_width, mask_height, rotate_angle=rotate_angle)
 
         current_image = prev_image
 
@@ -287,63 +283,47 @@ def create_zoom_single(
 
         current_image.paste(prev_image, mask=prev_image)
 
+        all_images.append(current_image)
 
-        # interpolation steps between 2 inpainted images (=sequential zoom and crop)
-        for j in range(num_interpol_frames - 1):
-            interpol_image = current_image
 
-            interpol_width = round(
-                (
-                    1
-                    - (1 - 2 * mask_width / width)
-                    ** (1 - (j + 1) / num_interpol_frames)
-                )
-                * width
-                / 2
-            )
 
-            interpol_height = round(
-                (
-                    1
-                    - (1 - 2 * mask_height / height)
-                    ** (1 - (j + 1) / num_interpol_frames)
-                )
-                * height
-                / 2
-            )
 
-            interpol_image = interpol_image.crop(
-                (
-                    interpol_width,
-                    interpol_height,
-                    width - interpol_width,
-                    height - interpol_height,
-                )
-            )
+    # Now create interpolation frames
+    all_frames = []
+    num_interpol_frames = round(video_frame_rate * zoom_speed)
 
-            interpol_image = interpol_image.resize((width, height))
+    for idx in range(len(all_images)-1):
 
-            # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
-            interpol_width2 = round(
-                (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
-                / 2
-                * width
-            )
+        img, prev_image = all_images[-idx-1], all_images[-idx-2]
 
-            interpol_height2 = round(
-                (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
-                / 2
-                * height
-            )
+        
+        for j in range(num_interpol_frames):
 
-            prev_image_fix_crop = shrink_and_paste_on_blank(
-                prev_image_fix, interpol_width2, interpol_height2
-            )
+            # calculate interpolation factor
+            interpol_factor = j / (num_interpol_frames)
 
-            interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
+            scaled_img = zoom_image(img, 1+interpol_factor, - (1-interpol_factor)*rotate_angle + rotate_angle)
+            scaled_prev_img = zoom_image(prev_image, 0.5 + interpol_factor/2, interpol_factor*rotate_angle + rotate_angle)
+                    
 
-            all_frames.append(interpol_image)
-        all_frames.append(current_image)
+            if rotate_angle != 0 and idx > 0: # fix black borders when rotating
+                next_image = all_images[-idx]
+
+                next_image = zoom_image(next_image, 2*(1+interpol_factor), -(1-interpol_factor)*rotate_angle)
+
+                interpol_image = next_image.copy()
+                interpol_image.paste(scaled_img, mask=scaled_img)
+            else:
+                interpol_image = scaled_img
+
+
+            interpol_image.paste(scaled_prev_img, mask=scaled_prev_img)
+
+            all_frames.append(interpol_image.rotate((idx+1)*2*rotate_angle))
+
+
+    all_frames = all_frames[::-1]
+
 
     video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
     output_path = shared.opts.data.get(
@@ -409,6 +389,14 @@ def on_ui_tabs():
                         value=8,
                         label="Total Outpaint Steps",
                         info="The more it is, the longer your videos will be",
+                    )
+                    main_rotate_per_step = gr.Slider(
+                        minimum=-180,
+                        maximum=180,
+                        step=1,
+                        value=0,
+                        label="Rotation (degrees per step)",
+                        info="The degrees your image will be rotated before the next outpainting steps.",
                     )
                     main_prompts = gr.Dataframe(
                         type="array",
@@ -579,6 +567,7 @@ def on_ui_tabs():
                 main_height,
                 batchcount_slider,
                 main_sampler,
+                main_rotate_per_step,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )

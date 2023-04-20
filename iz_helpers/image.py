@@ -22,3 +22,28 @@ def shrink_rotate_and_paste_on_blank(current_image, mask_width, mask_height, rot
     blank_image = blank_image.rotate(rotate_angle, resample=Image.BICUBIC)
 
     return blank_image
+
+
+from PIL import Image
+
+def zoom_image(img, zoom_factor, rotate_angle):
+    # Get the original size of the image
+    width, height = img.size
+
+    # Calculate the new size of the image
+    new_width = int(width * zoom_factor)
+    new_height = int(height * zoom_factor)
+
+    img = img.convert("RGBA")
+    img = img.rotate(rotate_angle)
+
+    # Resize the image using the new size
+    zoomed_image = img.resize((new_width, new_height))
+
+    # Create a new image with the same dimensions as the original image
+    output_image = Image.new("RGBA", (width, height), (1,0,0,0))
+
+    # Paste the zoomed image onto the output image
+    output_image.paste(zoomed_image, (int((width - new_width) / 2), int((height - new_height) / 2)))
+
+    return output_image
