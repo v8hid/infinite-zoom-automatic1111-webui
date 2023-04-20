@@ -242,7 +242,7 @@ def create_zoom_single(
         )
     else:
         # switch to txt2img model
-        checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_txt2img_model", modules.sd_models.checkpoint_alisases[0])]
+        checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_txt2img_model", "Euler a")]
         if (not checkinfo):
             raise NameError("Checklist not found in registry")
         if progress: progress(0, desc="Loading Model for txt2img: " + checkinfo.name)
