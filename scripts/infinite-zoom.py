@@ -287,6 +287,7 @@ def create_zoom_single(
 
         current_image.paste(prev_image, mask=prev_image)
 
+
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             interpol_image = current_image
