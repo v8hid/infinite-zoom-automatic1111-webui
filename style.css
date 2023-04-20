@@ -4,6 +4,7 @@
 }
 
 /* first column min width */
-#tab_iz_interface  th {
+#tab_iz_interface th:first-child  {
+    flex: 0 0 0%;
     width: 0;
 }
