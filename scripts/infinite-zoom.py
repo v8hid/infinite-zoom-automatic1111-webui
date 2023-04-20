@@ -241,12 +241,14 @@ def create_zoom_single(
             (width, height), resample=Image.LANCZOS
         )
     else:
-        # switch to txt2img model
-        checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_txt2img_model", "Euler a")]
-        if (not checkinfo):
-            raise NameError("Checklist not found in registry")
-        if progress: progress(0, desc="Loading Model for txt2img: " + checkinfo.name)
-        modules.sd_models.load_model(checkinfo)
+        modelname = shared.opts.data.get("infzoom_txt2img_model")
+        if (modelname):
+            # switch to txt2img model
+            checkinfo = modules.sd_models.checkpoint_alisases[modelname]
+            if (not checkinfo):
+                raise NameError("Checklist not found in registry")
+            if progress: progress(0, desc="Loading Model for txt2img: " + checkinfo.name)
+            modules.sd_models.load_model(checkinfo)
 
         processed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
@@ -273,12 +275,14 @@ def create_zoom_single(
 
     all_frames.append(do_upscaleImg(current_image,upscale_do, upscaler_name,upscale_by) if upscale_do else current_image)
 
-    # switch to inpaint model now
-    checkinfo = modules.sd_models.checkpoint_alisases[shared.opts.data.get("infzoom_inpainting_model", "sd-v1-5-inpainting.ckpt")]
-    if (not checkinfo):
-        raise NameError("Checklist not found in registry")
-    if progress: progress(0, desc="Loading Model for inpainting/img2img: " + checkinfo.name)
-    modules.sd_models.load_model(checkinfo)
+    inmodelname = shared.opts.data.get("infzoom_inpainting_model")
+    if (inmodelname):
+        # switch to inpaint model now
+        checkinfo = modules.sd_models.checkpoint_alisases[inmodelname]
+        if (not checkinfo):
+            raise NameError("Checklist not found in registry")
+        if progress: progress(0, desc="Loading Model for inpainting/img2img: " + checkinfo.name)
+        modules.sd_models.load_model(checkinfo)
 
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
