@@ -7,7 +7,9 @@
 </p>
 
 This is an extension for the AUTOMATIC1111's webui that allows users to create infinite zoom effect videos using stable diffusion outpainting method. 
-
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/62482657/233385585-82d7157e-1438-4cf8-b805-220d96bbbe31.gif" width="332" height="188" />
+</p>
 
 ## How to install?
 <details>
@@ -18,11 +20,11 @@ This is an extension for the AUTOMATIC1111's webui that allows users to create i
 2. Go to the `Extensions tab` > `Install from URL`.
 
 3. Enter `https://github.com/v8hid/infinite-zoom-automatic1111-webui.git` for the URL and leave the second field empty and wait for it to be installed.
-> <img width="587" alt="Screenshot 2023-04-12 at 10 17 32 PM" src="https://user-images.githubusercontent.com/62482657/231554653-16484c48-582e-489d-8191-bafc4cccbd3b.png">
+> <img width="587" alt="Screenshot" src="https://user-images.githubusercontent.com/62482657/231554653-16484c48-582e-489d-8191-bafc4cccbd3b.png">
 
 4. Go to the Installed tab and press Apply, wait for installation, and restart.
 
-> <img width="616" alt="Screenshot 2023-04-12 at 10 17 57 PM" src="https://user-images.githubusercontent.com/62482657/231554793-4a54ae94-51d2-408e-9908-2eed73cde9c0.png">
+> <img width="616" alt="Screenshot" src="https://user-images.githubusercontent.com/62482657/231554793-4a54ae94-51d2-408e-9908-2eed73cde9c0.png">
 
 5. Wait for the Stable Diffusion WebUI to restart and now you can try the Infinite Zoom extension.
 
@@ -101,7 +103,7 @@ It works on free colab plan
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 <a target="_blank" href="https://github.com/v8hid/infinite-zoom-stable-diffusion">
-  <img src="https://img.shields.io/static/v1?label=github&message=repository&color=blue&style=flat&logo=github&logoColor=white" alt="Open In Colab"/>
+  <img src="https://img.shields.io/static/v1?label=github&message=repository&color=blue&style=flat&logo=github&logoColor=white" alt="GitHub Repo"/>
 </a>
 
 ## Contributing
