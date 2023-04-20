@@ -1,9 +1,9 @@
 import sys
 import os
 import time
+import json
+from jsonschema import validate
 
-basedir = os.getcwd()
-sys.path.extend(basedir + "/extensions/infinite-zoom-automatic1111-webui/")
 import numpy as np
 import gradio as gr
 from PIL import Image
@@ -12,7 +12,7 @@ import json
 
 from iz_helpers import shrink_and_paste_on_blank, write_video
 from webui import wrap_gradio_gpu_call
-from modules import script_callbacks
+from modules import script_callbacks, scripts
 import modules.shared as shared
 from modules.processing import (
     process_images,
@@ -25,6 +25,10 @@ import scripts.postprocessing_upscale
 from modules.ui import create_output_panel, plaintext_to_html
 import modules.sd_models
 import modules.sd_samplers
+
+from modules import scripts
+usefulDirs = scripts.basedir().split(os.sep)[-2:] # contains install and our extension foldername
+jsonprompt_schemafile = usefulDirs[0]+"/"+usefulDirs[1]+"/scripts/promptschema.json"
 
 available_samplers = [s.name for s in modules.sd_samplers.samplers]
 
@@ -409,11 +413,23 @@ def create_zoom_single(
         plaintext_to_html(""),
     )
 
+
+def validatePromptJson_throws(data):
+    with open(jsonprompt_schemafile, "r") as s: schema = json.load(s)
+    validate(instance=data, schema=schema)
+    
 def putPrompts(files):
-    with open(files.name, 'r') as f:
-        file_contents = f.read()
-        data = json.loads(file_contents)
-    return [gr.DataFrame.update(data["prompts"]), gr.Textbox.update(data["negPrompt"])]
+
+    try:
+        with open(files.name, 'r') as f:
+            file_contents = f.read()
+            data = json.loads(file_contents)
+            validatePromptJson_throws(data)
+            return [gr.DataFrame.update(data["prompts"]), gr.Textbox.update(data["negPrompt"])]
+        
+    except Exception:
+        gr.Error("loading your prompt failed. It seems to be invalid. Your prompt table is preserved.")
+        return [gr.DataFrame.update(), gr.Textbox.update()]
 
 def clearPrompts():
     return [gr.DataFrame.update(value=[[0,"Infinite Zoom. Start over"]]), gr.Textbox.update("")]
@@ -452,6 +468,7 @@ def on_ui_tabs():
 
                     try:
                         jpr = json.loads(pr)
+                        validatePromptJson_throws(jpr)
                     except Exception:
                         jpr = invalid_prompt
 
