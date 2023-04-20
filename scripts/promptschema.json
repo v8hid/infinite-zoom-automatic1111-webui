@@ -2,54 +2,48 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
-        "prompts": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": [
-                            {
-                                "oneOf": [
-                                    {
-                                        "type": "integer",
-                                        "minimum": 0
-                                    },
-                                    {
-                                        "type": "string"
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "string"
-                            }
-                        ],
-                        "minItems": 2,
-                        "maxItems": 2,
-                        "uniqueItems": true
+      "prompts": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
                     },
-                    "minItems": 1
+                    {
+                      "type": "string"
+                    }
+                  ]
                 },
-                "headers": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "minItems": 2
+                {
+                  "type": "string"
                 }
+              ],
+              "minItems": 0,
+              "maxItems": 999,
+              "uniqueItems": false
             },
-            "required": [
-                "data",
-                "headers"
-            ]
+            "minItems": 0
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2
+          }
         },
-        "negPrompt": {
-            "type": "string"
-        }
+        "required": ["data", "headers"]
+      },
+      "negPrompt": {
+        "type": "string"
+      }
     },
-    "required": [
-        "prompts",
-        "negPrompt"
-    ]
-}
+    "required": ["prompts", "negPrompt"]
+  }

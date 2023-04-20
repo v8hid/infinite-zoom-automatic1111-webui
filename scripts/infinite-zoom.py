@@ -37,7 +37,20 @@ jsonprompt_schemafile = (
 
 available_samplers = [s.name for s in modules.sd_samplers.samplers]
 
-default_prompt = '{"prompts":{"data":[[0,"Cat"],["1","Dog"],["2","Happy Pets"]],"headers":["outpaint steps","prompt"]},"negPrompt":"ugly"}'
+default_prompt = """
+{
+    "prompts":{
+        "headers":["outpaint steps","prompt"],
+        "data":[
+            [0,"Cat"],
+            ["1","Dog"],
+            [2,"Happy Pets"]
+        ]
+    },
+    "negPrompt":"ugly"
+}
+"""
+
 empty_prompt = (
     '{"prompts":{"data":[],"headers":["outpaint steps","prompt"]},"negPrompt":""}'
 )
