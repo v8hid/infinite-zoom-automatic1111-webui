@@ -35,7 +35,7 @@ jsonprompt_schemafile = (
     usefulDirs[0] + "/" + usefulDirs[1] + "/scripts/promptschema.json"
 )
 
-available_samplers = [s.name for s in modules.sd_samplers.samplers]
+available_samplers = [s.name for s in modules.sd_samplers.samplers if "UniPc" not in s.name]
 
 default_prompt = """
 {
@@ -787,10 +787,11 @@ def on_ui_settings():
     section = ("infinite-zoom", "Infinite Zoom")
 
     shared.opts.add_option(
+        "outputs"
         "infzoom_outpath",
         shared.OptionInfo(
             "",
-            "Path where to store your infinite video. Let empty to use img2img-output",
+            "Path where to store your infinite video. Default is Outputs",
             gr.Textbox,
             {"interactive": True},
             section=section,
