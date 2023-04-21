@@ -13,8 +13,9 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
     if reversed == True:
         frames = frames[::-1]
 
-    # Get dimensions of the frames
-    # w, h = frames[0].size
+    # Get dimensions of the first frames, all subsequent has to be same sized
+    for k in frames:
+        assert (k.size == frames[0].size,"Different frame sizes found!")
 
     # Create an imageio video writer, avoid block size of 512.
     writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)

@@ -1,9 +1,9 @@
 import sys
 import os
 import time
+import json
+from jsonschema import validate
 
-basedir = os.getcwd()
-sys.path.extend(basedir + "/extensions/infinite-zoom-automatic1111-webui/")
 import numpy as np
 import gradio as gr
 from PIL import Image
@@ -12,7 +12,7 @@ import json
 
 from iz_helpers import shrink_and_paste_on_blank, write_video
 from webui import wrap_gradio_gpu_call
-from modules import script_callbacks
+from modules import script_callbacks, scripts
 import modules.shared as shared
 from modules.processing import (
     process_images,
@@ -20,30 +20,47 @@ from modules.processing import (
     StableDiffusionProcessingImg2Img,
 )
 
-from modules.ui import create_output_panel, plaintext_to_html
+from scripts import postprocessing_upscale
 
-available_samplers = [
-    "DDIM",
-    "Euler a",
-    "Euler",
-    "LMS",
-    "Heun",
-    "DPM2",
-    "DPM2 a",
-    "DPM++ 2S a",
-    "DPM++ 2M",
-    "DPM++ SDE",
-    "DPM fast",
-    "DPM adaptive",
-    "LMS Karras",
-    "DPM2 Karras",
-    "DPM2 a Karras",
-    "DPM++ 2S a Karras",
-    "DPM++ 2M Karras",
-    "DPM++ SDE Karras",
-]
-default_prompt = "A psychedelic jungle with trees that have glowing, fractal-like patterns, Simon stalenhag poster 1920s style, street level view, hyper futuristic, 8k resolution, hyper realistic"
-default_negative_prompt = "frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur"
+from modules.ui import create_output_panel, plaintext_to_html
+import modules.sd_models
+import modules.sd_samplers
+
+from modules import scripts
+
+usefulDirs = scripts.basedir().split(os.sep)[
+    -2:
+]  # contains install and our extension foldername
+jsonprompt_schemafile = (
+    usefulDirs[0] + "/" + usefulDirs[1] + "/scripts/promptschema.json"
+)
+
+available_samplers = [s.name for s in modules.sd_samplers.samplers if "UniPc" not in s.name]
+
+default_prompt = """
+{
+    "prompts":{
+        "headers":["outpaint steps","prompt"],
+        "data":[
+            [0,"Huge spectacular Waterfall in a dense tropical forest,epic perspective,(vegetation overgrowth:1.3)(intricate, ornamentation:1.1),(baroque:1.1), fantasy, (realistic:1) digital painting , (magical,mystical:1.2) , (wide angle shot:1.4), (landscape composed:1.2)(medieval:1.1), divine,cinematic,(tropical forest:1.4),(river:1.3)mythology,india, volumetric lighting, Hindu ,epic,  Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2) <lora:epiNoiseoffset_v2:0.6> "],
+        ]
+    },
+    "negPrompt":"frames, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur  bad-artist"
+}
+"""
+
+empty_prompt = (
+    '{"prompts":{"data":[],"headers":["outpaint steps","prompt"]},"negPrompt":""}'
+)
+
+# must be python dict
+invalid_prompt = {
+    "prompts": {
+        "data": [[0, "Your prompt-json is invalid, please check Settings"]],
+        "headers": ["outpaint steps", "prompt"],
+    },
+    "negPrompt": "Invalid prompt-json",
+}
 
 
 def closest_upper_divisible_by_eight(num):
@@ -51,6 +68,49 @@ def closest_upper_divisible_by_eight(num):
         return num
     else:
         return math.ceil(num / 8) * 8
+
+
+# example fail: 720 px width * 1.66 upscale => 1195.2 => 1195 crash
+# 512 px * 1.66 = 513.66 = ?
+# assume ffmpeg will CUT to integer
+# 721 /720
+
+def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
+    if not upscale_do:
+        return curImg
+ 
+    # ensure even width and even height for ffmpeg
+    # if odd, switch to scale to mode
+    rwidth  = round(curImg.width  * upscale_by)
+    rheight = round(curImg.height * upscale_by)
+
+    ups_mode = 2 # upscale_by
+    if ( (rwidth %2) == 1 ):
+        ups_mode = 1
+        rwidth += 1
+    if ( (rheight %2) == 1 ):
+        ups_mode = 1
+        rheight += 1
+
+    if (1 == ups_mode ):
+        print ("Infinite Zoom: aligning output size to even width and height: " + str(rwidth) +" x "+str(rheight), end='\r' )
+
+    pp = postprocessing_upscale.scripts_postprocessing.PostprocessedImage(
+        curImg
+    )
+    ups = postprocessing_upscale.ScriptPostprocessingUpscale()
+    ups.process(
+        pp,
+        upscale_mode=ups_mode,
+        upscale_by=upscale_by,
+        upscale_to_width=rwidth,
+        upscale_to_height=rheight,
+        upscale_crop=False,
+        upscaler_1_name=upscaler_name,
+        upscaler_2_name=None,
+        upscaler_2_visibility=0.0,
+    )
+    return pp.image
 
 
 def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
@@ -90,6 +150,7 @@ def renderImg2Img(
     inpainting_padding,
 ):
     processed = None
+
     p = StableDiffusionProcessingImg2Img(
         sd_model=shared.sd_model,
         outpath_samples=shared.opts.outdir_img2img_samples,
@@ -126,6 +187,28 @@ def fix_env_Path_ffprobe():
         os.environ["PATH"] = envpath + path_sep + ffppath
 
 
+def load_model_from_setting(model_field_name, progress, progress_desc):
+    # fix typo in Automatic1111 vs Vlad111
+    if hasattr(modules.sd_models, "checkpoint_alisases"):
+        checkPList = modules.sd_models.checkpoint_alisases
+    elif hasattr(modules.sd_models, "checkpoint_aliases"):
+        checkPList = modules.sd_models.checkpoint_aliases
+    else:
+        raise Exception("This is not a compatible StableDiffusion Platform, can not access checkpoints")
+    
+    model_name = shared.opts.data.get(model_field_name)
+    if model_name is not None and model_name != "":
+        checkinfo = checkPList[model_name]
+
+        if not checkinfo:
+            raise NameError(model_field_name + " Does not exist in your models.")
+
+        if progress: 
+            progress(0, desc=progress_desc + checkinfo.name)
+
+        modules.sd_models.load_model(checkinfo)
+
+
 def create_zoom(
     prompts_array,
     negative_prompt,
@@ -133,6 +216,7 @@ def create_zoom(
     guidance_scale,
     num_inference_steps,
     custom_init_image,
+    custom_exit_image,
     video_frame_rate,
     video_zoom_mode,
     video_start_frame_dupe_amount,
@@ -147,8 +231,12 @@ def create_zoom(
     outputsizeH,
     batchcount,
     sampler,
+    upscale_do,
+    upscaler_name,
+    upscale_by,
     progress=None,
 ):
+
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
         result = create_zoom_single(
@@ -158,6 +246,7 @@ def create_zoom(
             guidance_scale,
             num_inference_steps,
             custom_init_image,
+            custom_exit_image,
             video_frame_rate,
             video_zoom_mode,
             video_start_frame_dupe_amount,
@@ -171,6 +260,9 @@ def create_zoom(
             outputsizeW,
             outputsizeH,
             sampler,
+            upscale_do,
+            upscaler_name,
+            upscale_by,
             progress,
         )
     return result
@@ -183,6 +275,7 @@ def create_zoom_single(
     guidance_scale,
     num_inference_steps,
     custom_init_image,
+    custom_exit_image,
     video_frame_rate,
     video_zoom_mode,
     video_start_frame_dupe_amount,
@@ -196,6 +289,9 @@ def create_zoom_single(
     outputsizeW,
     outputsizeH,
     sampler,
+    upscale_do,
+    upscaler_name,
+    upscale_by,
     progress=None,
 ):
     # try:
@@ -229,6 +325,8 @@ def create_zoom_single(
             (width, height), resample=Image.LANCZOS
         )
     else:
+        load_model_from_setting("infzoom_txt2img_model", progress, "Loading Model for txt2img: ")
+
         processed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
             negative_prompt,
@@ -246,19 +344,26 @@ def create_zoom_single(
     num_interpol_frames = round(video_frame_rate * zoom_speed)
 
     all_frames = []
-    all_frames.append(current_image)
+
+    if upscale_do and progress:
+        progress(0, desc="upscaling inital image")
+
+    all_frames.append(
+        do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
+        if upscale_do
+        else current_image
+    )
+
+    load_model_from_setting("infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: " )
+
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
         print(print_out)
-        # if progress is not None:
-        #     progress(
-        #         ((i + 1) / num_outpainting_steps),
-        #         desc=print_out,
-        #     )
+        if progress:
+            progress(((i + 1) / num_outpainting_steps), desc=print_out)
+
         prev_image_fix = current_image
-
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
-
         current_image = prev_image
 
         # create mask (black image with white mask_width width edges)
@@ -267,6 +372,7 @@ def create_zoom_single(
 
         # inpainting step
         current_image = current_image.convert("RGB")
+
         processed = renderImg2Img(
             prompts[max(k for k in prompts.keys() if k <= i)],
             negative_prompt,
@@ -341,8 +447,23 @@ def create_zoom_single(
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
 
-            all_frames.append(interpol_image)
-        all_frames.append(current_image)
+            if upscale_do and progress:
+                progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
+
+            all_frames.append(
+                do_upscaleImg(interpol_image, upscale_do, upscaler_name, upscale_by)
+                if upscale_do
+                else interpol_image
+            )
+
+        if upscale_do and progress:
+            progress(((i + 1) / num_outpainting_steps), desc="upscaling current")
+
+        all_frames.append(
+            do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
+            if upscale_do
+            else current_image
+        )
 
     video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
     output_path = shared.opts.data.get(
@@ -372,17 +493,38 @@ def create_zoom_single(
     )
 
 
-def exportPrompts(p, np):
-    print("prompts:" + str(p) + "\n" + str(np))
+def validatePromptJson_throws(data):
+    with open(jsonprompt_schemafile, "r") as s:
+        schema = json.load(s)
+    validate(instance=data, schema=schema)
 
 
 def putPrompts(files):
-    file_paths = [file.name for file in files]
-    with open(files.name, "r") as f:
-        file_contents = f.read()
-        data = json.loads(file_contents)
-        print(data)
-    return [gr.DataFrame.update(data["prompts"]), gr.Textbox.update(data["negPrompt"])]
+    try:
+        with open(files.name, "r") as f:
+            file_contents = f.read()
+            data = json.loads(file_contents)
+            validatePromptJson_throws(data)
+            return [
+                gr.DataFrame.update(data["prompts"]),
+                gr.Textbox.update(data["negPrompt"]),
+            ]
+
+    except Exception:
+        gr.Error(
+            "loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
+        )
+        print(
+            "[InfiniteZoom:] Loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
+        )
+        return [gr.DataFrame.update(), gr.Textbox.update()]
+
+
+def clearPrompts():
+    return [
+        gr.DataFrame.update(value=[[0, "Infinite Zoom. Start over"]]),
+        gr.Textbox.update(""),
+    ]
 
 
 def on_ui_tabs():
@@ -396,8 +538,9 @@ def on_ui_tabs():
 
             """
         )
-        generate_btn = gr.Button(value="Generate video", variant="primary")
-        interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
+        with gr.Row():
+            generate_btn = gr.Button(value="Generate video", variant="primary")
+            interrupt = gr.Button(value="Interrupt", elem_id="interrupt_training")
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
                 with gr.Tab("Main"):
@@ -409,18 +552,30 @@ def on_ui_tabs():
                         label="Total Outpaint Steps",
                         info="The more it is, the longer your videos will be",
                     )
+
+                    # safe reading json prompt
+                    pr = shared.opts.data.get("infzoom_defPrompt", default_prompt)
+                    if not pr:
+                        pr = empty_prompt
+
+                    try:
+                        jpr = json.loads(pr)
+                        validatePromptJson_throws(jpr)
+                    except Exception:
+                        jpr = invalid_prompt
+
                     main_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint step", "prompt"],
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),
-                        value=[[0, default_prompt]],
+                        value=jpr["prompts"],
                         wrap=True,
                     )
 
                     main_negative_prompt = gr.Textbox(
-                        value=default_negative_prompt, label="Negative Prompt"
+                        value=jpr["negPrompt"], label="Negative Prompt"
                     )
 
                     # these button will be moved using JS unde the dataframe view as small ones
@@ -431,7 +586,7 @@ def on_ui_tabs():
                         elem_id="infzoom_exP_butt",
                     )
                     importPrompts_button = gr.UploadButton(
-                        value="Import prompts",
+                        label="Import prompts",
                         variant="secondary",
                         elem_classes="sm infzoom_tab_butt",
                         elem_id="infzoom_imP_butt",
@@ -447,6 +602,19 @@ def on_ui_tabs():
                         outputs=[main_prompts, main_negative_prompt],
                         inputs=[importPrompts_button],
                     )
+
+                    clearPrompts_button = gr.Button(
+                        value="Clear prompts",
+                        variant="secondary",
+                        elem_classes="sm infzoom_tab_butt",
+                        elem_id="infzoom_clP_butt",
+                    )
+                    clearPrompts_button.click(
+                        fn=clearPrompts,
+                        inputs=[],
+                        outputs=[main_prompts, main_negative_prompt],
+                    )
+
                     main_sampler = gr.Dropdown(
                         label="Sampler",
                         choices=available_samplers,
@@ -483,7 +651,12 @@ def on_ui_tabs():
                             value=50,
                             label="Sampling Steps for each outpaint",
                         )
-                    init_image = gr.Image(type="pil", label="custom initial image")
+                    with gr.Row():
+                        init_image = gr.Image(type="pil", label="custom initial image")
+                        exit_image = gr.Image(
+                            type="pil", label="custom exit image", visible=False
+                        )  # TODO: implement exit-image rendering
+
                     batchcount_slider = gr.Slider(
                         minimum=1,
                         maximum=25,
@@ -545,6 +718,26 @@ def on_ui_tabs():
                         label="masked padding", minimum=0, maximum=256, value=0
                     )
 
+                with gr.Tab("Post proccess"):
+                    upscale_do = gr.Checkbox(False, label="Enable Upscale")
+                    upscaler_name = gr.Dropdown(
+                        label="Upscaler",
+                        elem_id="infZ_upscaler",
+                        choices=[x.name for x in shared.sd_upscalers],
+                        value=shared.sd_upscalers[0].name,
+                    )
+
+                    upscale_by = gr.Slider(
+                        label="Upscale by factor", minimum=1, maximum=8, value=1
+                    )
+                    with gr.Accordion("Help", open=False):
+                        gr.Markdown(
+                            """# Performance critical
+Depending on amount of frames and which upscaler you choose it might took a long time to render.  
+Our best experience and trade-off is the R-ERSGAn4x upscaler.
+"""
+                        )
+
             with gr.Column(scale=1, variant="compact"):
                 output_video = gr.Video(label="Output").style(width=512, height=512)
                 (
@@ -553,10 +746,10 @@ def on_ui_tabs():
                     html_info,
                     html_log,
                 ) = create_output_panel(
-                    "infinit-zoom", shared.opts.outdir_img2img_samples
+                    "infinite-zoom", shared.opts.outdir_img2img_samples
                 )
         generate_btn.click(
-            fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, '', '']),
+            fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
             inputs=[
                 main_prompts,
                 main_negative_prompt,
@@ -564,6 +757,7 @@ def on_ui_tabs():
                 main_guidance_scale,
                 sampling_step,
                 init_image,
+                exit_image,
                 video_frame_rate,
                 video_zoom_mode,
                 video_start_frame_dupe_amount,
@@ -578,6 +772,9 @@ def on_ui_tabs():
                 main_height,
                 batchcount_slider,
                 main_sampler,
+                upscale_do,
+                upscaler_name,
+                upscale_by,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
@@ -590,10 +787,11 @@ def on_ui_settings():
     section = ("infinite-zoom", "Infinite Zoom")
 
     shared.opts.add_option(
+        "outputs"
         "infzoom_outpath",
         shared.OptionInfo(
             "",
-            "Path where to store your infinite video. Let empty to use img2img-output",
+            "Path where to store your infinite video. Default is Outputs",
             gr.Textbox,
             {"interactive": True},
             section=section,
@@ -640,6 +838,39 @@ def on_ui_settings():
             "Writing videos has  dependency to an existing FFPROBE executable on your machine. D/L here (https://github.com/BtbN/FFmpeg-Builds/releases) your OS variant and point to your installation path",
             gr.Textbox,
             {"interactive": True},
+            section=section,
+        ),
+    )
+
+    shared.opts.add_option(
+        "infzoom_txt2img_model",
+        shared.OptionInfo(
+            None,
+            "Name of your desired model to render keyframes (txt2img)",
+            gr.Dropdown,
+            lambda: {"choices": shared.list_checkpoint_tiles()},
+            section=section,
+        ),
+    )
+
+    shared.opts.add_option(
+        "infzoom_inpainting_model",
+        shared.OptionInfo(
+            None,
+            "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ",
+            gr.Dropdown,
+            lambda: {"choices": shared.list_checkpoint_tiles()},
+            section=section,
+        ),
+    )
+
+    shared.opts.add_option(
+        "infzoom_defPrompt",
+        shared.OptionInfo(
+            default_prompt,
+            "Default prompt-setup to start with'",
+            gr.Code,
+            {"interactive": True, "language": "json"},
             section=section,
         ),
     )
