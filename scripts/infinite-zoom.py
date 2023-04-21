@@ -72,19 +72,41 @@ def closest_upper_divisible_by_eight(num):
         return math.ceil(num / 8) * 8
 
 
+# example fail: 720 px width * 1.66 upscale => 1195.2 => 1195 crash
+# 512 px * 1.66 = 513.66 = ?
+# assume ffmpeg will CUT to integer
+# 721 /720
+
 def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
     if not upscale_do:
         return curImg
+ 
+    # ensure even width and even height for ffmpeg
+    # if odd, switch to scale to mode
+    rwidth  = round(curImg.width  * upscale_by)
+    rheight = round(curImg.height * upscale_by)
+
+    ups_mode = 2 # upscale_by
+    if ( (rwidth %2) == 1 ):
+        ups_mode = 1
+        rwidth += 1
+    if ( (rheight %2) == 1 ):
+        ups_mode = 1
+        rheight += 1
+
+    if (1 == ups_mode ):
+        print ("Infinite Zoom: aligning output size to even width and height: " + str(rwidth) +" x "+str(rheight), end='\r' )
+
     pp = postprocessing_upscale.scripts_postprocessing.PostprocessedImage(
         curImg
     )
     ups = postprocessing_upscale.ScriptPostprocessingUpscale()
     ups.process(
         pp,
-        upscale_mode=2,
+        upscale_mode=ups_mode,
         upscale_by=upscale_by,
-        upscale_to_width=None,
-        upscale_to_height=None,
+        upscale_to_width=rwidth,
+        upscale_to_height=rheight,
         upscale_crop=False,
         upscaler_1_name=upscaler_name,
         upscaler_2_name=None,
@@ -216,6 +238,7 @@ def create_zoom(
     upscale_by,
     progress=None,
 ):
+
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
         result = create_zoom_single(
