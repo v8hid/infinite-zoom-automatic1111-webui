@@ -113,7 +113,7 @@ def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
     return pp.image
 
 
-def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, height):
+def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, seed, width, height):
     processed = None
     p = StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
@@ -121,7 +121,7 @@ def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, hei
         outpath_grids=shared.opts.outdir_txt2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,
-        # seed=-1,
+        seed=seed,
         sampler_name=sampler,
         n_iter=1,
         steps=steps,
@@ -130,7 +130,8 @@ def renderTxt2Img(prompt, negative_prompt, sampler, steps, cfg_scale, width, hei
         height=height,
     )
     processed = process_images(p)
-    return processed
+    newseed = p.seed
+    return processed, newseed
 
 
 def renderImg2Img(
@@ -139,6 +140,7 @@ def renderImg2Img(
     sampler,
     steps,
     cfg_scale,
+    seed,
     width,
     height,
     init_image,
@@ -157,7 +159,7 @@ def renderImg2Img(
         outpath_grids=shared.opts.outdir_img2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,
-        # seed=-1,
+        seed=seed,
         sampler_name=sampler,
         n_iter=1,
         steps=steps,
@@ -175,7 +177,8 @@ def renderImg2Img(
     # p.latent_mask = Image.new("RGB", (p.width, p.height), "white")
 
     processed = process_images(p)
-    return processed
+    newseed = p.seed
+    return processed, newseed
 
 
 def fix_env_Path_ffprobe():
@@ -227,6 +230,7 @@ def create_zoom(
     inpainting_full_res,
     inpainting_padding,
     zoom_speed,
+    seed,
     outputsizeW,
     outputsizeH,
     batchcount,
@@ -257,6 +261,7 @@ def create_zoom(
             inpainting_full_res,
             inpainting_padding,
             zoom_speed,
+            seed,
             outputsizeW,
             outputsizeH,
             sampler,
@@ -286,6 +291,7 @@ def create_zoom_single(
     inpainting_full_res,
     inpainting_padding,
     zoom_speed,
+    seed,
     outputsizeW,
     outputsizeH,
     sampler,
@@ -319,24 +325,28 @@ def create_zoom_single(
     mask_image = np.array(current_image)[:, :, 3]
     mask_image = Image.fromarray(255 - mask_image).convert("RGB")
     current_image = current_image.convert("RGB")
+    current_seed = seed
 
     if custom_init_image:
         current_image = custom_init_image.resize(
             (width, height), resample=Image.LANCZOS
         )
+        print("using Custom Initial Image")
     else:
         load_model_from_setting("infzoom_txt2img_model", progress, "Loading Model for txt2img: ")
 
-        processed = renderTxt2Img(
+        processed, newseed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
             negative_prompt,
             sampler,
             num_inference_steps,
             guidance_scale,
+            current_seed,
             width,
             height,
         )
         current_image = processed.images[0]
+        current_seed = newseed
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
@@ -357,7 +367,7 @@ def create_zoom_single(
     load_model_from_setting("infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: " )
 
     for i in range(num_outpainting_steps):
-        print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps)
+        print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps) + " Seed: " + str(current_seed)
         print(print_out)
         if progress:
             progress(((i + 1) / num_outpainting_steps), desc=print_out)
@@ -373,23 +383,31 @@ def create_zoom_single(
         # inpainting step
         current_image = current_image.convert("RGB")
 
-        processed = renderImg2Img(
-            prompts[max(k for k in prompts.keys() if k <= i)],
-            negative_prompt,
-            sampler,
-            num_inference_steps,
-            guidance_scale,
-            width,
-            height,
-            current_image,
-            mask_image,
-            inpainting_denoising_strength,
-            inpainting_mask_blur,
-            inpainting_fill_mode,
-            inpainting_full_res,
-            inpainting_padding,
-        )
-        current_image = processed.images[0]
+        if custom_exit_image and ((i + 1) == num_outpainting_steps):
+            current_image = custom_exit_image.resize(
+                (width, height), resample=Image.LANCZOS
+            )
+            print("using Custom Exit Image")
+        else:
+            processed, newseed = renderImg2Img(
+                prompts[max(k for k in prompts.keys() if k <= i)],
+                negative_prompt,
+                sampler,
+                num_inference_steps,
+                guidance_scale,
+                current_seed,
+                width,
+                height,
+                current_image,
+                mask_image,
+                inpainting_denoising_strength,
+                inpainting_mask_blur,
+                inpainting_fill_mode,
+                inpainting_full_res,
+                inpainting_padding,
+            )
+            current_image = processed.images[0]
+            current_seed = newseed
 
         current_image.paste(prev_image, mask=prev_image)
 
@@ -614,13 +632,14 @@ def on_ui_tabs():
                         inputs=[],
                         outputs=[main_prompts, main_negative_prompt],
                     )
-
-                    main_sampler = gr.Dropdown(
-                        label="Sampler",
-                        choices=available_samplers,
-                        value="Euler a",
-                        type="value",
-                    )
+                    with gr.Row():
+                        seed = gr.Number(label="Seed", value=-1, precision=0, interactive=True)
+                        main_sampler = gr.Dropdown(
+                            label="Sampler",
+                            choices=available_samplers,
+                            value="Euler a",
+                            type="value",
+                        )
                     with gr.Row():
                         main_width = gr.Slider(
                             minimum=16,
@@ -653,9 +672,7 @@ def on_ui_tabs():
                         )
                     with gr.Row():
                         init_image = gr.Image(type="pil", label="custom initial image")
-                        exit_image = gr.Image(
-                            type="pil", label="custom exit image", visible=False
-                        )  # TODO: implement exit-image rendering
+                        exit_image = gr.Image(type="pil", label="custom exit image")
 
                     batchcount_slider = gr.Slider(
                         minimum=1,
@@ -768,6 +785,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 inpainting_full_res,
                 inpainting_padding,
                 video_zoom_speed,
+                seed,
                 main_width,
                 main_height,
                 batchcount_slider,
