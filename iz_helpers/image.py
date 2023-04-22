@@ -16,8 +16,14 @@ def shrink_and_paste_on_blank(current_image, mask_width, mask_height):
     new_height = height - 2 * mask_height
 
     # resize and paste onto blank image
-    prev_image = current_image.resize((new_width, new_height))
+    prev_image = current_image.resize((new_width, new_height), Image.LANCZOS)
     blank_image = Image.new("RGBA", (width, height), (0, 0, 0, 1))
-    blank_image.paste(prev_image, (mask_width, mask_height))
+    paste_box = (
+        mask_width,
+        mask_height,
+        mask_width + new_width,
+        mask_height + new_height
+    )
+    blank_image.paste(prev_image, paste_box)
 
     return blank_image

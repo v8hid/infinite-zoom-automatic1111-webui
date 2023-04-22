@@ -2,6 +2,12 @@ import numpy as np
 import imageio
 from PIL import Image
 
+def closest_upper_divisible_by_eight(num):
+    if num % 8 == 0:
+        return num
+    else:
+        return math.ceil(num / 8) * 8
+
 def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30):
     """
     Writes frames to an mp4 video file
@@ -13,9 +19,19 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
     if reversed == True:
         frames = frames[::-1]
 
-    # Get dimensions of the first frames, all subsequent has to be same sized
-    for k in frames:
-        assert (k.size == frames[0].size,"Different frame sizes found!")
+    first_frame_size = frames[0].size
+    even_frame_size = (closest_upper_divisible_by_eight(first_frame_size[0]), closest_upper_divisible_by_eight(first_frame_size[1]))
+    
+    # Drop random garbage frames that are outsize of the requested generation size to prevent ffmpeg from throwing an error.
+    filtered_frames = [frame for frame in frames if frame.size == first_frame_size]
+    frames = filtered_frames
+    
+    # Resize all frames to the even dimensions
+    #resized_frames = [frame.resize(even_frame_size, Image.ANTIALIAS) for frame in frames]
+    #frames = resized_frames
+    
+    
+    #frames.pop()
 
     # Create an imageio video writer, avoid block size of 512.
     writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)
