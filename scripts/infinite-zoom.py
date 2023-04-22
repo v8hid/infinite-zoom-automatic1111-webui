@@ -390,7 +390,11 @@ def create_zoom_single(
             inpainting_padding,
         )
         current_image = processed.images[0]
-
+        
+        if (current_image.size[0] != processed.images[1].size[0]):
+            processed.images.pop(0)
+            current_image = processed.images[0]
+        
         current_image.paste(prev_image, mask=prev_image)
 
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
