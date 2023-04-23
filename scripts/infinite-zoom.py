@@ -6,7 +6,7 @@ from jsonschema import validate
 
 import numpy as np
 import gradio as gr
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 import math
 import json
 
@@ -237,7 +237,11 @@ def create_zoom(
     sampler,
     upscale_do,
     upscaler_name,
+    upscalerinterpol_name,
     upscale_by,
+    exitgamma,
+    maskwidth_slider,
+    maskheight_slider,
     progress=None,
 ):
 
@@ -267,8 +271,12 @@ def create_zoom(
             sampler,
             upscale_do,
             upscaler_name,
+            upscalerinterpol_name,
             upscale_by,
-            progress,
+            exitgamma,
+            maskwidth_slider,
+            maskheight_slider,
+            progress
         )
     return result
 
@@ -297,7 +305,11 @@ def create_zoom_single(
     sampler,
     upscale_do,
     upscaler_name,
+    upscalerinterpol_name,
     upscale_by,
+    exitgamma,
+    maskwidth_slider,
+    maskheight_slider,
     progress=None,
 ):
     # try:
@@ -348,6 +360,12 @@ def create_zoom_single(
         current_image = processed.images[0]
         current_seed = newseed
 
+#    if custom_exit_image and ((i + 1) == num_outpainting_steps):
+#        mask_width = 4  # fade out whole interpol
+#        mask_height =4  # 
+#        mask_width  = width*(20//30)  # fade out whole interpol
+#        mask_height = height*(20//30)  # 
+#    else:
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
 
@@ -366,11 +384,32 @@ def create_zoom_single(
 
     load_model_from_setting("infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: " )
 
+    # setup filesystem paths
+    video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
+    output_path = shared.opts.data.get(
+        "infzoom_outpath", shared.opts.data.get("outdir_img2img_samples")
+    )
+    save_path = os.path.join(
+        output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
+    )
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    out = os.path.join(save_path, video_file_name)
+
+
     for i in range(num_outpainting_steps):
         print_out = "Outpaint step: " + str(i + 1) + " / " + str(num_outpainting_steps) + " Seed: " + str(current_seed)
         print(print_out)
         if progress:
             progress(((i + 1) / num_outpainting_steps), desc=print_out)
+
+        if custom_exit_image and ((i + 1) == num_outpainting_steps):
+            mask_width=round(width*maskwidth_slider)
+            mask_height=round(height*maskheight_slider)
+            
+            # 30 fps@ maskw 0.25 => 30
+            # normalize to default speed of 30 fps for 0.25 mask factor
+            num_interpol_frames = round(num_interpol_frames * (1 + (max(maskheight_slider,maskwidth_slider)/0.5) * exitgamma))
 
         prev_image_fix = current_image
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
@@ -416,23 +455,13 @@ def create_zoom_single(
             interpol_image = current_image
 
             interpol_width = round(
-                (
-                    1
-                    - (1 - 2 * mask_width / width)
-                    ** (1 - (j + 1) / num_interpol_frames)
-                )
-                * width
-                / 2
+                (1 - (1 - 2 * mask_width / width)** (1 - (j + 1) / num_interpol_frames))
+                * width/2
             )
 
             interpol_height = round(
-                (
-                    1
-                    - (1 - 2 * mask_height / height)
-                    ** (1 - (j + 1) / num_interpol_frames)
-                )
-                * height
-                / 2
+                ( 1 - (1 - 2 * mask_height / height) ** (1 - (j + 1) / num_interpol_frames) )
+                  * height/2
             )
 
             interpol_image = interpol_image.crop(
@@ -449,27 +478,89 @@ def create_zoom_single(
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
             interpol_width2 = round(
                 (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
-                / 2
-                * width
+                / 2 * width
             )
 
             interpol_height2 = round(
                 (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
-                / 2
-                * height
+                / 2 * height
             )
 
+            if custom_exit_image and ((i + 1) == num_outpainting_steps):
+                opacity = 1 - ((j+1)/num_interpol_frames )
+            else: opacity = 1
+
             prev_image_fix_crop = shrink_and_paste_on_blank(
-                prev_image_fix, interpol_width2, interpol_height2
+                prev_image_fix, interpol_width2, interpol_height2,
+                opacity=opacity
             )
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
+
+            # exit image: from now we see the last prompt on the exit image 
+            if custom_exit_image and ((i + 1) == num_outpainting_steps):
+
+                mask_img = Image.new("L", (width,height), 0)
+                in_center_x = interpol_image.width/2
+                in_center_y = interpol_image.height/2
+                
+                # Draw a circular brush on the mask image with 64px diameter and 8px softness
+                draw = ImageDraw.Draw(mask_img)
+                brush_size = 64
+                brush_softness = 8
+                brush = Image.new("L", (brush_size, brush_size), 255)
+                draw_brush = ImageDraw.Draw(brush)
+                draw_brush.ellipse((brush_softness, brush_softness, brush_size-brush_softness, brush_size-brush_softness), fill=255, outline=None)
+                brush = brush.filter(ImageFilter.GaussianBlur(radius=brush_softness))
+                brush_width, brush_height = brush.size
+
+                # Draw the rectangular frame on the mask image using the circular brush
+                frame_width = width-2*interpol_width2
+                frame_height = height-2*interpol_height2
+                frame_left = in_center_x - (frame_width // 2)
+                frame_top = in_center_y - (frame_height // 2)
+                frame_right = frame_left + frame_width
+                frame_bottom = frame_top + frame_height
+                draw.ellipse((frame_left, frame_top, frame_left+brush_width, frame_top+brush_height), fill=255, outline=None)
+                draw.ellipse((frame_right-brush_width, frame_top, frame_right, frame_top+brush_height), fill=255, outline=None)
+                draw.ellipse((frame_left, frame_bottom-brush_height, frame_left+brush_width, frame_bottom), fill=255, outline=None)
+                draw.ellipse((frame_right-brush_width, frame_bottom-brush_height, frame_right, frame_bottom), fill=255, outline=None)
+
+                draw.rectangle((max(0,frame_left-brush_size/2), max(0,frame_top+brush_size/2), max(0,frame_right-brush_size/2), max(0,frame_bottom-brush_size/2)), fill=255)
+
+                # inner rect, now we have a bordermask
+                draw.rectangle((max(0,frame_left+brush_size/2), max(0,frame_top-brush_size/2), max(0,frame_right+brush_size/2), max(0,frame_bottom+brush_size/2)), fill=0)
+
+                # Blur the mask image to soften the edges
+                #mask_img = mask_img.filter(ImageFilter.GaussianBlur(radius=8))
+                #mask_img = ImageOps.invert(mask_img)
+                #mask_img.save(output_path+os.pathsep+"Mask"+str(int(time.time()))+".png")
+                """processed, newseed = renderImg2Img(
+                                prompts[max(k for k in prompts.keys() if k <= i)],
+                                negative_prompt,
+                                sampler,
+                                num_inference_steps,
+                                guidance_scale,
+                                current_seed,
+                                width,
+                                height,
+                                interpol_image,
+                                mask_img,
+                                inpainting_denoising_strength,
+                                inpainting_mask_blur,
+
+                                inpainting_fill_mode,
+                                inpainting_full_res,
+                                inpainting_padding,
+                            )
+                #interpol_image = processed.images[0]
+                """
 
             if upscale_do and progress:
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
 
             all_frames.append(
-                do_upscaleImg(interpol_image, upscale_do, upscaler_name, upscale_by)
+                do_upscaleImg(interpol_image, upscale_do, upscalerinterpol_name, upscale_by)
                 if upscale_do
                 else interpol_image
             )
@@ -483,16 +574,6 @@ def create_zoom_single(
             else current_image
         )
 
-    video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
-    output_path = shared.opts.data.get(
-        "infzoom_outpath", shared.opts.data.get("outdir_img2img_samples")
-    )
-    save_path = os.path.join(
-        output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
-    )
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    out = os.path.join(save_path, video_file_name)
     write_video(
         out,
         all_frames,
@@ -563,7 +644,7 @@ def on_ui_tabs():
             with gr.Column(scale=1, variant="panel"):
                 with gr.Tab("Main"):
                     main_outpaint_steps = gr.Slider(
-                        minimum=2,
+                        minimum=1,
                         maximum=100,
                         step=1,
                         value=8,
@@ -674,13 +755,19 @@ def on_ui_tabs():
                         init_image = gr.Image(type="pil", label="custom initial image")
                         exit_image = gr.Image(type="pil", label="custom exit image")
 
-                    batchcount_slider = gr.Slider(
-                        minimum=1,
-                        maximum=25,
-                        value=shared.opts.data.get("infzoom_batchcount", 1),
-                        step=1,
-                        label="Batch Count",
-                    )
+                    with gr.Row():
+                        batchcount_slider = gr.Slider(
+                            minimum=1,
+                            maximum=25,
+                            value=shared.opts.data.get("infzoom_batchcount", 1),
+                            step=1,
+                            label="Batch Count",
+                        )
+                        with gr.Accordion("I know what I´m doing"):
+                            gamma_slider = gr.Slider(value=0.0,minimum=0.0,maximum=10,label="Exit Image speed - Gamma")
+                            maskwidth_slider = gr.Slider(value=0.25,minimum=0.1,maximum=0.49,label="MaskWidth ratio ")
+                            maskheight_slider = gr.Slider(value=0.25,minimum=0.1,maximum=0.49,label="MaskHeight ratio")
+
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
@@ -737,12 +824,20 @@ def on_ui_tabs():
 
                 with gr.Tab("Post proccess"):
                     upscale_do = gr.Checkbox(False, label="Enable Upscale")
-                    upscaler_name = gr.Dropdown(
-                        label="Upscaler",
-                        elem_id="infZ_upscaler",
-                        choices=[x.name for x in shared.sd_upscalers],
-                        value=shared.sd_upscalers[0].name,
-                    )
+                    with gr.Row():
+                        upscaler_name = gr.Dropdown(
+                            label="Upscaler for keyframes (txt2img;inpaint)",
+                            elem_id="infZ_upscaler",
+                            choices=[x.name for x in shared.sd_upscalers],
+                            value=shared.sd_upscalers[0].name,
+                        )
+
+                        upscalerinterpol_name = gr.Dropdown(
+                            label="Upscaler for interpolation",
+                            elem_id="infZ_upscaler_interpol",
+                            choices=[x.name for x in shared.sd_upscalers],
+                            value=shared.sd_upscalers[0].name,
+                        )
 
                     upscale_by = gr.Slider(
                         label="Upscale by factor", minimum=1, maximum=8, value=1
@@ -751,7 +846,7 @@ def on_ui_tabs():
                         gr.Markdown(
                             """# Performance critical
 Depending on amount of frames and which upscaler you choose it might took a long time to render.  
-Our best experience and trade-off is the R-ERSGAn4x upscaler.
+Our best experience and trade-off is the R-ESRGAN 4x upscaler.
 """
                         )
 
@@ -792,7 +887,12 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 main_sampler,
                 upscale_do,
                 upscaler_name,
+                upscalerinterpol_name,
                 upscale_by,
+                gamma_slider,
+                maskwidth_slider,
+                maskheight_slider,
+
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
