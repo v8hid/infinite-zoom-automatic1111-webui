@@ -75,7 +75,7 @@ def closest_upper_divisible_by_eight(num):
 # assume ffmpeg will CUT to integer
 # 721 /720
 
-def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
+def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by, desc=""):
     if not upscale_do:
         return curImg
  
@@ -94,6 +94,8 @@ def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
 
     if (1 == ups_mode ):
         print ("Infinite Zoom: aligning output size to even width and height: " + str(rwidth) +" x "+str(rheight), end='\r' )
+
+    print (f"Infinite Zoom: Upscaling by {str(upscale_by)} with {str(upscaler_name)}. {desc}", end='\r' )
 
     pp = postprocessing_upscale.scripts_postprocessing.PostprocessedImage(
         curImg
@@ -280,6 +282,66 @@ def create_zoom(
         )
     return result
 
+def calculate_interpolframes_curve(width,height,mask_width,mask_height,num_interpol_frames):
+    from scipy.signal import savgol_filter
+    #import matplotlib.pyplot as plt
+
+    # Create a list to store the values of interpol_width for each frame
+    interpol_width_values = []
+    interpol_height_values = []
+
+    # Calculate interpol_width for each frame and add it to the list
+    for j in range(num_interpol_frames):
+        interpol_width = round((1 - (1 - 2 * mask_width / width)**(1 - (j + 1) / num_interpol_frames)) * width / 2)
+        interpol_width_values.append(interpol_width)
+
+    # Apply a SAVGOL filter to the interpol_width values
+    window_size = 7  # adjust the window size as needed
+    interpol_width_smoothed = savgol_filter(interpol_width_values, window_size, 2)
+    interpol_width_smoothed = np.round(interpol_width_smoothed).astype(int) # Round the output to the nearest integer
+
+
+    # Calculate interpol_width for each frame and add it to the list
+    for j in range(num_interpol_frames):
+        interpol_height = round((1 - (1 - 2 * mask_height / height)**(1 - (j + 1) / num_interpol_frames)) * height / 2)
+        interpol_height_values.append(interpol_height)
+
+    # Apply a SAVGOL filter to the interpol_width values
+    window_size = 7  # adjust the window size as needed
+    interpol_height_smoothed = savgol_filter(interpol_width_values, window_size, 2)
+    interpol_height_smoothed = np.round(interpol_width_smoothed).astype(int) # Round the output to the nearest integer
+
+    return interpol_width_smoothed,interpol_height_smoothed
+
+def calculate_interpolframes2_curve(width,height,mask_width,mask_height,num_interpol_frames, interpol_LUT_W, interpol_LUT_H):
+    from scipy.signal import savgol_filter
+    #import matplotlib.pyplot as plt
+
+    # Create a list to store the values of interpol_width for each frame
+    interpol_width_values = []
+    interpol_height_values = []
+
+    # Calculate interpol_width for each frame and add it to the list
+    for j in range(num_interpol_frames):
+        interpol_width = round( (1 - (width - 2 * mask_width) / (width - 2 * interpol_LUT_W[j])) / 2 * width)
+        interpol_width_values.append(interpol_width)
+
+    # Apply a SAVGOL filter to the interpol_width values
+    window_size = 7  # adjust the window size as needed
+    interpol_width_smoothed = savgol_filter(interpol_width_values, window_size, 2)
+
+    # Calculate interpol_width for each frame and add it to the list
+    for j in range(num_interpol_frames):
+        interpol_height = round( (1 - (height - 2 * mask_height) / (height - 2 * interpol_LUT_H[j])) / 2 * height)
+        interpol_height_values.append(interpol_height)
+
+    # Apply a SAVGOL filter to the interpol_width values
+    window_size = 7  # adjust the window size as needed
+    interpol_height_smoothed = savgol_filter(interpol_width_values, window_size, 2)
+
+    return interpol_width_smoothed,interpol_height_smoothed
+
+
 
 def create_zoom_single(
     prompts_array,
@@ -411,6 +473,9 @@ def create_zoom_single(
             # normalize to default speed of 30 fps for 0.25 mask factor
             num_interpol_frames = round(num_interpol_frames * (1 + (max(maskheight_slider,maskwidth_slider)/0.5) * exitgamma))
 
+        interpol_LUT_W, interpol_LUT_H = calculate_interpolframes_curve(width,height,mask_width,mask_height,num_interpol_frames)
+        interpol2_LUT_W, interpol2_LUT_H = calculate_interpolframes2_curve(width,height,mask_width,mask_height,num_interpol_frames, interpol_LUT_W, interpol_LUT_H)
+
         prev_image_fix = current_image
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
         current_image = prev_image
@@ -453,7 +518,7 @@ def create_zoom_single(
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             interpol_image = current_image
-
+            """
             interpol_width = round(
                 (1 - (1 - 2 * mask_width / width)** (1 - (j + 1) / num_interpol_frames))
                 * width/2
@@ -463,6 +528,10 @@ def create_zoom_single(
                 ( 1 - (1 - 2 * mask_height / height) ** (1 - (j + 1) / num_interpol_frames) )
                   * height/2
             )
+            """
+
+            interpol_width = interpol_LUT_W[j]
+            interpol_height = interpol_LUT_H[j]
 
             interpol_image = interpol_image.crop(
                 (
@@ -476,6 +545,7 @@ def create_zoom_single(
             interpol_image = interpol_image.resize((width, height))
 
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
+            """
             interpol_width2 = round(
                 (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
                 / 2 * width
@@ -485,21 +555,26 @@ def create_zoom_single(
                 (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
                 / 2 * height
             )
+            """
+
+            interpol_width2  = round(interpol2_LUT_W[j])
+            interpol_height2 = round(interpol2_LUT_H[j])
 
             if custom_exit_image and ((i + 1) == num_outpainting_steps):
                 opacity = 1 - ((j+1)/num_interpol_frames )
-            else: opacity = 1
+            else: 
+                opacity = 1
 
             prev_image_fix_crop = shrink_and_paste_on_blank(
                 prev_image_fix, interpol_width2, interpol_height2,
-                opacity=opacity
+                opacity
             )
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
 
             # exit image: from now we see the last prompt on the exit image 
             if custom_exit_image and ((i + 1) == num_outpainting_steps):
-
+                """
                 mask_img = Image.new("L", (width,height), 0)
                 in_center_x = interpol_image.width/2
                 in_center_y = interpol_image.height/2
@@ -535,6 +610,7 @@ def create_zoom_single(
                 #mask_img = mask_img.filter(ImageFilter.GaussianBlur(radius=8))
                 #mask_img = ImageOps.invert(mask_img)
                 #mask_img.save(output_path+os.pathsep+"Mask"+str(int(time.time()))+".png")
+                """
                 """processed, newseed = renderImg2Img(
                                 prompts[max(k for k in prompts.keys() if k <= i)],
                                 negative_prompt,
@@ -560,7 +636,7 @@ def create_zoom_single(
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
 
             all_frames.append(
-                do_upscaleImg(interpol_image, upscale_do, upscalerinterpol_name, upscale_by)
+                do_upscaleImg(interpol_image, upscale_do, upscalerinterpol_name, upscale_by, desc=f"(interpol: {i}/{num_interpol_frames})")
                 if upscale_do
                 else interpol_image
             )
@@ -569,7 +645,7 @@ def create_zoom_single(
             progress(((i + 1) / num_outpainting_steps), desc="upscaling current")
 
         all_frames.append(
-            do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
+            do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by, desc=f"(outpaint: {i}/{num_outpainting_steps}")
             if upscale_do
             else current_image
         )
