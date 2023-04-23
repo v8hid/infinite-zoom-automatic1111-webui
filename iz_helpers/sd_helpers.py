@@ -70,7 +70,12 @@ def renderImg2Img(
         mask=mask_image,
     )
     # p.latent_mask = Image.new("RGB", (p.width, p.height), "white")
-
+    
     processed = process_images(p)
+    # For those that use Image grids this will make sure that ffmpeg does not crash out
+    if (processed.images[0].size[0] != processed.images[1].size[0]):
+        processed.images.pop(0)
+        print("\nGrid image detected applying patch")
+    
     newseed = p.seed
     return processed, newseed
