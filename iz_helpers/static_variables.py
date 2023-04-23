@@ -1,5 +1,5 @@
 import os
-import scripts
+from modules import scripts
 import modules.sd_samplers
 
 default_prompt = """
