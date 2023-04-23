@@ -73,7 +73,7 @@ def renderImg2Img(
     
     processed = process_images(p)
     # For those that use Image grids this will make sure that ffmpeg does not crash out
-    if (processed.images[0].size[0] != processed.images[-1].size[0]):
+    if (len(processed.images) > 1) and (processed.images[0].size[0] != processed.images[-1].size[0]):
         processed.images.pop(0)
         print("\nGrid image detected applying patch")
     
