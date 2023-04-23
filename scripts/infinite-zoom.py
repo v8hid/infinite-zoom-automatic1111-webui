@@ -1,3 +1,4 @@
+
 import sys
 import os
 import time
@@ -473,8 +474,8 @@ def create_zoom_single(
             # normalize to default speed of 30 fps for 0.25 mask factor
             num_interpol_frames = round(num_interpol_frames * (1 + (max(maskheight_slider,maskwidth_slider)/0.5) * exitgamma))
 
-        interpol_LUT_W, interpol_LUT_H = calculate_interpolframes_curve(width,height,mask_width,mask_height,num_interpol_frames)
-        interpol2_LUT_W, interpol2_LUT_H = calculate_interpolframes2_curve(width,height,mask_width,mask_height,num_interpol_frames, interpol_LUT_W, interpol_LUT_H)
+        #interpol_LUT_W, interpol_LUT_H = calculate_interpolframes_curve(width,height,mask_width,mask_height,num_interpol_frames)
+        #interpol2_LUT_W, interpol2_LUT_H = calculate_interpolframes2_curve(width,height,mask_width,mask_height,num_interpol_frames, interpol_LUT_W, interpol_LUT_H)
 
         prev_image_fix = current_image
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
@@ -518,20 +519,20 @@ def create_zoom_single(
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             interpol_image = current_image
-            """
-            interpol_width = round(
-                (1 - (1 - 2 * mask_width / width)** (1 - (j + 1) / num_interpol_frames))
-                * width/2
-            )
 
-            interpol_height = round(
-                ( 1 - (1 - 2 * mask_height / height) ** (1 - (j + 1) / num_interpol_frames) )
-                  * height/2
-            )
-            """
+            if (True):
+                interpol_width = round(
+                    (1 - (1 - 2 * mask_width / width)** (1 - (j + 1) / num_interpol_frames))
+                    * width/2
+                )
 
-            interpol_width = interpol_LUT_W[j]
-            interpol_height = interpol_LUT_H[j]
+                interpol_height = round(
+                    ( 1 - (1 - 2 * mask_height / height) ** (1 - (j + 1) / num_interpol_frames) )
+                    * height/2
+                )
+            else:
+                interpol_width = interpol_LUT_W[j]
+                interpol_height = interpol_LUT_H[j]
 
             interpol_image = interpol_image.crop(
                 (
@@ -542,23 +543,32 @@ def create_zoom_single(
                 )
             )
 
+            print (f"interpol: width x height: {interpol_width} {interpol_height}")
+
             interpol_image = interpol_image.resize((width, height))
 
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
-            """
-            interpol_width2 = round(
-                (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
-                / 2 * width
-            )
+            if (True):
+                interpol_width2 = round(
+                    (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
+                    / 2 * width
+                )
 
-            interpol_height2 = round(
-                (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
-                / 2 * height
-            )
-            """
+                interpol_height2 = round(
+                    (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
+                    / 2 * height
+                )
 
-            interpol_width2  = round(interpol2_LUT_W[j])
-            interpol_height2 = round(interpol2_LUT_H[j])
+
+                """
+                interpol_width2 =  mask_width - interpol_width
+                interpol_height2 = mask_height - interpol_height
+                """
+                print (f"interpol2: width2 x height2: {interpol_width2} {interpol_height2}")
+
+            else:
+                interpol_width2  = round(interpol2_LUT_W[j])
+                interpol_height2 = round(interpol2_LUT_H[j])
 
             if custom_exit_image and ((i + 1) == num_outpainting_steps):
                 opacity = 1 - ((j+1)/num_interpol_frames )
