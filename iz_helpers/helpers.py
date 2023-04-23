@@ -6,7 +6,7 @@ import modules.shared as shared
 import modules.sd_models
 import gradio as gr
 from scripts import postprocessing_upscale
-from static_variables import jsonprompt_schemafile
+from .static_variables import jsonprompt_schemafile
 
 
 def fix_env_Path_ffprobe():
