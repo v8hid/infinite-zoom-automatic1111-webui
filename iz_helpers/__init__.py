@@ -1,2 +1,2 @@
-from .image import shrink_and_paste_on_blank
-from .video import write_video
+from .ui import on_ui_tabs
+from .settings import on_ui_settings
