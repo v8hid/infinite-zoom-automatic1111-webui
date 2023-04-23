@@ -51,10 +51,10 @@ def on_ui_tabs():
 
                     main_prompts = gr.Dataframe(
                         type="array",
-                        headers=["outpaint step", "prompt"],
-                        datatype=["number", "str"],
+                        headers=["outpaint step", "prompt", "image location"],
+                        datatype=["number", "str", "str"],
                         row_count=1,
-                        col_count=(2, "fixed"),
+                        col_count=(3, "fixed"),
                         value=jpr["prompts"],
                         wrap=True,
                     )

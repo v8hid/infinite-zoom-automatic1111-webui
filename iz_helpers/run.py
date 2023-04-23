@@ -111,14 +111,20 @@ def create_zoom_single(
     fix_env_Path_ffprobe()
 
     prompts = {}
+    prompt_images = {}
+
     for x in prompts_array:
         try:
             key = int(x[0])
             value = str(x[1])
+            file_loc = str(x[2])
             prompts[key] = value
+            prompt_images[key] = file_loc
         except ValueError:
             pass
     assert len(prompts_array) > 0, "prompts is empty"
+    print(str(len(prompts)) + " prompts found")
+    print(str(len(prompt_images)) + " prompts Images found")
 
     width = closest_upper_divisible_by_eight(outputsizeW)
     height = closest_upper_divisible_by_eight(outputsizeH)
@@ -128,6 +134,7 @@ def create_zoom_single(
     mask_image = Image.fromarray(255 - mask_image).convert("RGB")
     current_image = current_image.convert("RGB")
     current_seed = seed
+    extra_frames = 0
 
     if custom_init_image:
         current_image = custom_init_image.resize(
@@ -135,23 +142,26 @@ def create_zoom_single(
         )
         print("using Custom Initial Image")
     else:
-        load_model_from_setting(
-            "infzoom_txt2img_model", progress, "Loading Model for txt2img: "
-        )
+        if prompt_images[min(k for k in prompt_images.keys() if k >= 0)] == "":
+            load_model_from_setting(
+                "infzoom_txt2img_model", progress, "Loading Model for txt2img: "
+            )
 
-        processed, newseed = renderTxt2Img(
-            prompts[min(k for k in prompts.keys() if k >= 0)],
-            negative_prompt,
-            sampler,
-            num_inference_steps,
-            guidance_scale,
-            current_seed,
-            width,
-            height,
-        )
-        if(len(processed.images) > 0):
+            processed, current_seed = renderTxt2Img(
+                prompts[min(k for k in prompts.keys() if k >= 0)],
+                negative_prompt,
+                sampler,
+                num_inference_steps,
+                guidance_scale,
+                current_seed,
+                width,
+                height,
+            )
             current_image = processed.images[0]
-        current_seed = newseed
+        else:
+            current_image = Image.open(prompt_images[min(k for k in prompt_images.keys() if k >= 0)]).resize(
+                (width, height), resample=Image.LANCZOS
+            )
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
@@ -169,16 +179,17 @@ def create_zoom_single(
         else current_image
     )
 
-    load_model_from_setting(
-        "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
-    )
+    load_model_from_setting("infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: " )
 
-    for i in range(num_outpainting_steps):
+    if custom_exit_image:
+        extra_frames += 2
+
+    for i in range(num_outpainting_steps + extra_frames):
         print_out = (
             "Outpaint step: "
             + str(i + 1)
             + " / "
-            + str(num_outpainting_steps)
+            + str(num_outpainting_steps + extra_frames)
             + " Seed: "
             + str(current_seed)
         )
@@ -197,34 +208,40 @@ def create_zoom_single(
         # inpainting step
         current_image = current_image.convert("RGB")
 
-        if custom_exit_image and ((i + 1) == num_outpainting_steps):
+        # Custom and specified images work like keyframes
+        if custom_exit_image and (i + 1) >= (num_outpainting_steps + extra_frames):
             current_image = custom_exit_image.resize(
                 (width, height), resample=Image.LANCZOS
             )
             print("using Custom Exit Image")
-        else:
-            processed, newseed = renderImg2Img(
-                prompts[max(k for k in prompts.keys() if k <= i)],
-                negative_prompt,
-                sampler,
-                num_inference_steps,
-                guidance_scale,
-                current_seed,
-                width,
-                height,
-                current_image,
-                mask_image,
-                inpainting_denoising_strength,
-                inpainting_mask_blur,
-                inpainting_fill_mode,
-                inpainting_full_res,
-                inpainting_padding,
-            )
-            if(len(processed.images) > 0):
+        else:            
+            if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))] == "":
+                processed, current_seed = renderImg2Img(
+                    prompts[max(k for k in prompts.keys() if k <= (i + 1))],
+                    negative_prompt,
+                    sampler,
+                    num_inference_steps,
+                    guidance_scale,
+                    current_seed,
+                    width,
+                    height,
+                    current_image,
+                    mask_image,
+                    inpainting_denoising_strength,
+                    inpainting_mask_blur,
+                    inpainting_fill_mode,
+                    inpainting_full_res,
+                    inpainting_padding,
+                )
                 current_image = processed.images[0]
-            current_seed = newseed
-        if(len(processed.images) > 0):
-            current_image.paste(prev_image, mask=prev_image)
+                # only paste previous image when generating a new image
+                current_image.paste(prev_image, mask=prev_image)
+            else:
+                current_image = Image.open(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))]).resize(
+                    (width, height), resample=Image.LANCZOS
+                )
+
+        
 
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
@@ -305,6 +322,7 @@ def create_zoom_single(
     save_path = os.path.join(
         output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
     )
+    print("save to: " + save_path)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     out = os.path.join(save_path, video_file_name)
