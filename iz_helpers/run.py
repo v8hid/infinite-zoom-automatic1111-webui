@@ -412,6 +412,17 @@ def create_zoom_single(
             else current_image
         )
 
+    video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
+    output_path = shared.opts.data.get(
+        "infzoom_outpath", shared.opts.data.get("outdir_img2img_samples")
+    )
+    save_path = os.path.join(
+        output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
+    )
+    print("save to: " + save_path)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    out = os.path.join(save_path, video_file_name)
     write_video(
         out,
         all_frames,
