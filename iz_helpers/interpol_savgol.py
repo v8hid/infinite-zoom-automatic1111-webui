@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 
 # Define the values for width, mask_width, and num_interpol_frames
 width = 512
-mask_width = round(width*0.49)
-num_interpol_frames = 90
+
+mask_width = round(width*0.25)
+num_interpol_frames = 30
 
 # Create a list to store the values of interpol_width for each frame
 interpol_width_values = []

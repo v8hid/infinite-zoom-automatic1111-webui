@@ -23,6 +23,9 @@
                 },
                 {
                   "type": "string"
+                },
+                {
+                  "type": "string"
                 }
               ],
               "minItems": 0,
@@ -36,7 +39,7 @@
             "items": {
               "type": "string"
             },
-            "minItems": 2
+            "minItems": 3
           }
         },
         "required": ["data", "headers"]
