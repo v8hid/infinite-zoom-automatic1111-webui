@@ -4,7 +4,7 @@ from PIL import Image
 from modules.ui import plaintext_to_html
 import modules.shared as shared
 
-from .sd_helpers import (
+from .helpers import (
     fix_env_Path_ffprobe,
     closest_upper_divisible_by_eight,
     load_model_from_setting,
