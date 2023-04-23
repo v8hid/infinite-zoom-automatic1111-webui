@@ -31,7 +31,7 @@ def on_ui_tabs():
             with gr.Column(scale=1, variant="panel"):
                 with gr.Tab("Main"):
                     main_outpaint_steps = gr.Slider(
-                        minimum=2,
+                        minimum=1,
                         maximum=100,
                         step=1,
                         value=8,
@@ -143,13 +143,19 @@ def on_ui_tabs():
                         init_image = gr.Image(type="pil", label="custom initial image")
                         exit_image = gr.Image(type="pil", label="custom exit image")
 
-                    batchcount_slider = gr.Slider(
-                        minimum=1,
-                        maximum=25,
-                        value=shared.opts.data.get("infzoom_batchcount", 1),
-                        step=1,
-                        label="Batch Count",
-                    )
+                    with gr.Row():
+                        batchcount_slider = gr.Slider(
+                            minimum=1,
+                            maximum=25,
+                            value=shared.opts.data.get("infzoom_batchcount", 1),
+                            step=1,
+                            label="Batch Count",
+                        )
+                        with gr.Accordion("I know what I am doing!", open=False):
+                            gamma_slider = gr.Slider(value=0.0,minimum=0.0,maximum=10,label="Exit Image speed - Gamma")
+                            maskwidth_slider = gr.Slider(value=0.25,minimum=0.1,maximum=0.49,label="MaskWidth ratio ")
+                            maskheight_slider = gr.Slider(value=0.25,minimum=0.1,maximum=0.49,label="MaskHeight ratio")
+
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
@@ -206,12 +212,20 @@ def on_ui_tabs():
 
                 with gr.Tab("Post proccess"):
                     upscale_do = gr.Checkbox(False, label="Enable Upscale")
-                    upscaler_name = gr.Dropdown(
-                        label="Upscaler",
-                        elem_id="infZ_upscaler",
-                        choices=[x.name for x in shared.sd_upscalers],
-                        value=shared.sd_upscalers[0].name,
-                    )
+                    with gr.Row():
+                        upscaler_name = gr.Dropdown(
+                            label="Upscaler for keyframes (txt2img;inpaint)",
+                            elem_id="infZ_upscaler",
+                            choices=[x.name for x in shared.sd_upscalers],
+                            value=shared.sd_upscalers[0].name,
+                        )
+
+                        upscalerinterpol_name = gr.Dropdown(
+                            label="Upscaler for interpolation",
+                            elem_id="infZ_upscaler_interpol",
+                            choices=[x.name for x in shared.sd_upscalers],
+                            value=shared.sd_upscalers[0].name,
+                        )
 
                     upscale_by = gr.Slider(
                         label="Upscale by factor", minimum=1, maximum=8, value=1
@@ -220,7 +234,7 @@ def on_ui_tabs():
                         gr.Markdown(
                             """# Performance critical
 Depending on amount of frames and which upscaler you choose it might took a long time to render.  
-Our best experience and trade-off is the R-ERSGAn4x upscaler.
+Our best experience and trade-off is the R-ESRGAN 4x upscaler.
 """
                         )
 
@@ -261,7 +275,12 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 main_sampler,
                 upscale_do,
                 upscaler_name,
+                upscalerinterpol_name,
                 upscale_by,
+                gamma_slider,
+                maskwidth_slider,
+                maskheight_slider,
+
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )

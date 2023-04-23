@@ -1,6 +1,6 @@
 import math, time, os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from modules.ui import plaintext_to_html
 import modules.shared as shared
 
@@ -40,9 +40,14 @@ def create_zoom(
     sampler,
     upscale_do,
     upscaler_name,
+    upscalerinterpol_name,
     upscale_by,
+    exitgamma,
+    maskwidth_slider,
+    maskheight_slider,
     progress=None,
 ):
+
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
         result = create_zoom_single(
@@ -69,8 +74,12 @@ def create_zoom(
             sampler,
             upscale_do,
             upscaler_name,
+            upscalerinterpol_name,
             upscale_by,
-            progress,
+            exitgamma,
+            maskwidth_slider,
+            maskheight_slider,
+            progress
         )
     return result
 
@@ -99,7 +108,11 @@ def create_zoom_single(
     sampler,
     upscale_do,
     upscaler_name,
+    upscalerinterpol_name,
     upscale_by,
+    exitgamma,
+    maskwidth_slider,
+    maskheight_slider,
     progress=None,
 ):
     # try:
@@ -163,6 +176,12 @@ def create_zoom_single(
                 (width, height), resample=Image.LANCZOS
             )
 
+#    if custom_exit_image and ((i + 1) == num_outpainting_steps):
+#        mask_width = 4  # fade out whole interpol
+#        mask_height =4  # 
+#        mask_width  = width*(20//30)  # fade out whole interpol
+#        mask_height = height*(20//30)  # 
+#    else:
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
 
@@ -184,6 +203,18 @@ def create_zoom_single(
     if custom_exit_image:
         extra_frames += 2
 
+    # setup filesystem paths
+    video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
+    output_path = shared.opts.data.get(
+        "infzoom_outpath", shared.opts.data.get("outdir_img2img_samples")
+    )
+    save_path = os.path.join(
+        output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
+    )
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    out = os.path.join(save_path, video_file_name)
+
     for i in range(num_outpainting_steps + extra_frames):
         print_out = (
             "Outpaint step: "
@@ -196,6 +227,14 @@ def create_zoom_single(
         print(print_out)
         if progress:
             progress(((i + 1) / num_outpainting_steps), desc=print_out)
+
+        if custom_exit_image and ((i + 1) == num_outpainting_steps):
+            mask_width=round(width*maskwidth_slider)
+            mask_height=round(height*maskheight_slider)
+            
+            # 30 fps@ maskw 0.25 => 30
+            # normalize to default speed of 30 fps for 0.25 mask factor
+            num_interpol_frames = round(num_interpol_frames * (1 + (max(maskheight_slider,maskwidth_slider)/0.5) * exitgamma))
 
         prev_image_fix = current_image
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
@@ -214,7 +253,7 @@ def create_zoom_single(
                 (width, height), resample=Image.LANCZOS
             )
             print("using Custom Exit Image")
-        else:            
+        else:
             if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))] == "":
                 processed, current_seed = renderImg2Img(
                     prompts[max(k for k in prompts.keys() if k <= (i + 1))],
@@ -291,17 +330,81 @@ def create_zoom_single(
                 * height
             )
 
+            if custom_exit_image and ((i + 1) == num_outpainting_steps):
+                opacity = 1 - ((j+1)/num_interpol_frames )
+            else: opacity = 1
+
             prev_image_fix_crop = shrink_and_paste_on_blank(
-                prev_image_fix, interpol_width2, interpol_height2
+                prev_image_fix, interpol_width2, interpol_height2,
+                opacity=opacity
             )
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
+
+            # exit image: from now we see the last prompt on the exit image 
+            if custom_exit_image and ((i + 1) == num_outpainting_steps):
+
+                mask_img = Image.new("L", (width,height), 0)
+                in_center_x = interpol_image.width/2
+                in_center_y = interpol_image.height/2
+                
+                # Draw a circular brush on the mask image with 64px diameter and 8px softness
+                draw = ImageDraw.Draw(mask_img)
+                brush_size = 64
+                brush_softness = 8
+                brush = Image.new("L", (brush_size, brush_size), 255)
+                draw_brush = ImageDraw.Draw(brush)
+                draw_brush.ellipse((brush_softness, brush_softness, brush_size-brush_softness, brush_size-brush_softness), fill=255, outline=None)
+                brush = brush.filter(ImageFilter.GaussianBlur(radius=brush_softness))
+                brush_width, brush_height = brush.size
+
+                # Draw the rectangular frame on the mask image using the circular brush
+                frame_width = width-2*interpol_width2
+                frame_height = height-2*interpol_height2
+                frame_left = in_center_x - (frame_width // 2)
+                frame_top = in_center_y - (frame_height // 2)
+                frame_right = frame_left + frame_width
+                frame_bottom = frame_top + frame_height
+                draw.ellipse((frame_left, frame_top, frame_left+brush_width, frame_top+brush_height), fill=255, outline=None)
+                draw.ellipse((frame_right-brush_width, frame_top, frame_right, frame_top+brush_height), fill=255, outline=None)
+                draw.ellipse((frame_left, frame_bottom-brush_height, frame_left+brush_width, frame_bottom), fill=255, outline=None)
+                draw.ellipse((frame_right-brush_width, frame_bottom-brush_height, frame_right, frame_bottom), fill=255, outline=None)
+
+                draw.rectangle((max(0,frame_left-brush_size/2), max(0,frame_top+brush_size/2), max(0,frame_right-brush_size/2), max(0,frame_bottom-brush_size/2)), fill=255)
+
+                # inner rect, now we have a bordermask
+                draw.rectangle((max(0,frame_left+brush_size/2), max(0,frame_top-brush_size/2), max(0,frame_right+brush_size/2), max(0,frame_bottom+brush_size/2)), fill=0)
+
+                # Blur the mask image to soften the edges
+                #mask_img = mask_img.filter(ImageFilter.GaussianBlur(radius=8))
+                #mask_img = ImageOps.invert(mask_img)
+                #mask_img.save(output_path+os.pathsep+"Mask"+str(int(time.time()))+".png")
+                """processed, newseed = renderImg2Img(
+                                prompts[max(k for k in prompts.keys() if k <= i)],
+                                negative_prompt,
+                                sampler,
+                                num_inference_steps,
+                                guidance_scale,
+                                current_seed,
+                                width,
+                                height,
+                                interpol_image,
+                                mask_img,
+                                inpainting_denoising_strength,
+                                inpainting_mask_blur,
+
+                                inpainting_fill_mode,
+                                inpainting_full_res,
+                                inpainting_padding,
+                            )
+                #interpol_image = processed.images[0]
+                """
 
             if upscale_do and progress:
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
 
             all_frames.append(
-                do_upscaleImg(interpol_image, upscale_do, upscaler_name, upscale_by)
+                do_upscaleImg(interpol_image, upscale_do, upscalerinterpol_name, upscale_by)
                 if upscale_do
                 else interpol_image
             )
@@ -315,17 +418,6 @@ def create_zoom_single(
             else current_image
         )
 
-    video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
-    output_path = shared.opts.data.get(
-        "infzoom_outpath", shared.opts.data.get("outdir_img2img_samples")
-    )
-    save_path = os.path.join(
-        output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
-    )
-    print("save to: " + save_path)
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    out = os.path.join(save_path, video_file_name)
     write_video(
         out,
         all_frames,

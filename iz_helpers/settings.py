@@ -7,7 +7,8 @@ def on_ui_settings():
     section = ("infinite-zoom", "Infinite Zoom")
 
     shared.opts.add_option(
-        "outputs" "infzoom_outpath",
+        "outputs"
+        "infzoom_outpath",
         shared.OptionInfo(
             "",
             "Path where to store your infinite video. Default is Outputs",
