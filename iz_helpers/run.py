@@ -11,7 +11,7 @@ from .helpers import (
     do_upscaleImg,
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
-from .image import shrink_and_paste_on_blank
+from .image import shrink_and_paste_on_blank, open_image
 from .video import write_video
 
 
@@ -147,7 +147,7 @@ def create_zoom_single(
             "infzoom_txt2img_model", progress, "Loading Model for txt2img: "
         )
 
-        processed, newseed = renderTxt2Img(
+            processed, current_seed = renderTxt2Img(
             prompts[min(k for k in prompts.keys() if k >= 0)],
             negative_prompt,
             sampler,
@@ -158,7 +158,10 @@ def create_zoom_single(
             height,
         )
         current_image = processed.images[0]
-        current_seed = newseed
+        else:
+            current_image = open_image(prompt_images[min(k for k in prompt_images.keys() if k >= 0)]).resize(
+                (width, height), resample=Image.LANCZOS
+            )
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
@@ -176,16 +179,17 @@ def create_zoom_single(
         else current_image
     )
 
-    load_model_from_setting(
-        "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
-    )
+    load_model_from_setting("infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: " )
 
-    for i in range(num_outpainting_steps):
+    if custom_exit_image:
+        extra_frames += 2
+
+    for i in range(num_outpainting_steps + extra_frames):
         print_out = (
             "Outpaint step: "
             + str(i + 1)
             + " / "
-            + str(num_outpainting_steps)
+            + str(num_outpainting_steps + extra_frames)
             + " Seed: "
             + str(current_seed)
         )
@@ -204,14 +208,16 @@ def create_zoom_single(
         # inpainting step
         current_image = current_image.convert("RGB")
 
-        if custom_exit_image and ((i + 1) == num_outpainting_steps):
+        # Custom and specified images work like keyframes
+        if custom_exit_image and (i + 1) >= (num_outpainting_steps + extra_frames):
             current_image = custom_exit_image.resize(
                 (width, height), resample=Image.LANCZOS
             )
             print("using Custom Exit Image")
         else:
-            processed, newseed = renderImg2Img(
-                prompts[max(k for k in prompts.keys() if k <= i)],
+            if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))] == "":
+                processed, current_seed = renderImg2Img(
+                    prompts[max(k for k in prompts.keys() if k <= (i + 1))],
                 negative_prompt,
                 sampler,
                 num_inference_steps,
@@ -228,7 +234,13 @@ def create_zoom_single(
                 inpainting_padding,
             )
             current_image = processed.images[0]
-            current_seed = newseed
+                # only paste previous image when generating a new image
+                current_image.paste(prev_image, mask=prev_image)
+            else:
+                current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))]).resize(
+                    (width, height), resample=Image.LANCZOS
+                )
+
 
         current_image.paste(prev_image, mask=prev_image)
 
