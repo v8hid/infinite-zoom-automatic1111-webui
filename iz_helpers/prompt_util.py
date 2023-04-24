@@ -63,7 +63,7 @@ def readJsonPrompt(txt, returnFailPrompt=False):
     try:
         jpr = json.loads(txt)
     except Exception:
-        if returnFailPrompt is not None:
+        if returnFailPrompt:
             print (f"Infinite Zoom: Corrupted Json structure: {txt[:24]} ...")
             return invalid_prompt
         raise (f"Infinite Zoom: Corrupted Json structure: {txt[:24]} ...")
