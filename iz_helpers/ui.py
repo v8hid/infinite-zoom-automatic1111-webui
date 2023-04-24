@@ -45,10 +45,6 @@ def on_ui_tabs():
                         value=jpr["commonPrompt"], label="Common Prompt"
                     )
 
-                    main_common_prompt = gr.Textbox(
-                        value=jpr["commonPrompt"], label="Common Prompt"
-                    )
-
                     main_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint step", "prompt"],
