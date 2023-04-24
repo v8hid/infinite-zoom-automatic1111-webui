@@ -1,11 +1,10 @@
 import math
 import os
-import json
-from jsonschema import validate
 import modules.shared as shared
 import modules.sd_models
 import gradio as gr
 from scripts import postprocessing_upscale
+from .prompt_util import readJsonPrompt
 from .static_variables import jsonprompt_schemafile
 import asyncio
 
@@ -99,13 +98,12 @@ def validatePromptJson_throws(data):
         schema = json.load(s)
     validate(instance=data, schema=schema)
 
-
 def putPrompts(files):
     try:
         with open(files.name, "r") as f:
             file_contents = f.read()
-            data = json.loads(file_contents)
-            validatePromptJson_throws(data)
+
+            data = readJsonPrompt(file_contents,False)
             return [
                 gr.Textbox.update(data["commonPromptPrefix"]),
                 gr.DataFrame.update(data["prompts"]),
@@ -114,12 +112,11 @@ def putPrompts(files):
             ]
 
     except Exception:
-        gr.Error(
-            "loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
-        )
         print(
             "[InfiniteZoom:] Loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
         )
+        asyncio.run(
+            showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5)
         return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update()]
 
 
