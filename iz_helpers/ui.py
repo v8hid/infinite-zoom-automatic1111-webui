@@ -1,4 +1,3 @@
-import json
 import gradio as gr
 from .run import create_zoom
 import modules.shared as shared
@@ -6,11 +5,10 @@ from webui import wrap_gradio_gpu_call
 from modules.ui import create_output_panel
 from .static_variables import (
     default_prompt,
-    empty_prompt,
-    invalid_prompt,
     available_samplers,
 )
-from .helpers import validatePromptJson_throws, putPrompts, clearPrompts
+from .helpers import putPrompts, clearPrompts
+from .prompt_util import readJsonPrompt
 
 
 def on_ui_tabs():
@@ -41,13 +39,11 @@ def on_ui_tabs():
 
                     # safe reading json prompt
                     pr = shared.opts.data.get("infzoom_defPrompt", default_prompt)
-                    if not pr:
-                        pr = empty_prompt
-                    try:
-                        jpr = json.loads(pr)
-                        validatePromptJson_throws(jpr)
-                    except Exception:
-                        jpr = invalid_prompt
+                    jpr = readJsonPrompt(pr, True)
+
+                    main_common_prompt = gr.Textbox(
+                        value=jpr["commonPrompt"], label="Common Prompt"
+                    )
 
                     main_common_prompt = gr.Textbox(
                         value=jpr["commonPrompt"], label="Common Prompt"
@@ -83,8 +79,8 @@ def on_ui_tabs():
                     exportPrompts_button.click(
                         None,
                         _js="exportPrompts",
-                        inputs=[main_common_prompt, main_prompts, main_negative_prompt],
-                        outputs=None,
+                        inputs=[main_prompts, main_negative_prompt],
+                        outputs=None
                     )
                     importPrompts_button.upload(
                         fn=putPrompts,

@@ -1,12 +1,11 @@
 import math
 import os
-import json
-from jsonschema import validate
 import modules.shared as shared
 import modules.sd_models
 import gradio as gr
 from scripts import postprocessing_upscale
-from .static_variables import jsonprompt_schemafile
+from .prompt_util import readJsonPrompt
+import asyncio
 
 
 def fix_env_Path_ffprobe():
@@ -90,30 +89,27 @@ def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
     )
     return pp.image
 
-
-def validatePromptJson_throws(data):
-    with open(jsonprompt_schemafile, "r") as s:
-        schema = json.load(s)
-    validate(instance=data, schema=schema)
-
+async def showGradioErrorAsync(txt, delay=1):
+    await asyncio.sleep(delay)  # sleep for 1 second
+    raise gr.Error(txt)
 
 def putPrompts(files):
     try:
         with open(files.name, "r") as f:
             file_contents = f.read()
-            data = json.loads(file_contents)
-            validatePromptJson_throws(data)
+
+            data = readJsonPrompt(file_contents,False)
             return [
                 gr.DataFrame.update(data["prompts"]),
                 gr.Textbox.update(data["negPrompt"]),
             ]
 
     except Exception:
-        gr.Error(
-            "loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
-        )
         print(
             "[InfiniteZoom:] Loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
+        )
+        asyncio.run(
+            showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5)
         )
         return [gr.DataFrame.update(), gr.Textbox.update()]
 
