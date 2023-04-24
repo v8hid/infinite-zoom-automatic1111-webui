@@ -37,12 +37,11 @@
           "items": {
             "type": "string"
           },
-          "minItems": 3
+          "minItems": 2
         }
       },
       "required": [
-        "data",
-        "headers"
+        "data"
       ]
     },
     "negPrompt": {
