@@ -11,7 +11,7 @@ from .helpers import (
     do_upscaleImg,
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
-from .image import shrink_and_paste_on_blank
+from .image import shrink_and_paste_on_blank, open_image
 from .video import write_video
 
 
@@ -159,7 +159,7 @@ def create_zoom_single(
             )
             current_image = processed.images[0]
         else:
-            current_image = Image.open(prompt_images[min(k for k in prompt_images.keys() if k >= 0)]).resize(
+            current_image = open_image(prompt_images[min(k for k in prompt_images.keys() if k >= 0)]).resize(
                 (width, height), resample=Image.LANCZOS
             )
 
@@ -237,7 +237,7 @@ def create_zoom_single(
                 # only paste previous image when generating a new image
                 current_image.paste(prev_image, mask=prev_image)
             else:
-                current_image = Image.open(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))]).resize(
+                current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))]).resize(
                     (width, height), resample=Image.LANCZOS
                 )
 
