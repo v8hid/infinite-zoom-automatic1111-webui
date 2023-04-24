@@ -15,9 +15,6 @@ default_prompt = """
     "negPrompt":"frames, border, edges, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur bad-artist"
 }
 """
-available_samplers = [
-    s.name for s in modules.sd_samplers.samplers if "UniPc" not in s.name
-]
 
 empty_prompt = (
     '{"prompts":{"data":[],"headers":["outpaint steps","prompt","image location", "blend mask location", "is keyframe"]},"negPrompt":"", commonPromptPrefix:"", commonPromptSuffix:""}'
