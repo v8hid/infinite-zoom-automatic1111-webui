@@ -112,4 +112,4 @@ Contributions are welcome! Please follow these guidelines:
 
   1. Fork the repository.
   2. Make your changes and commit them.
-  3. Submit a pull request to the main repository.
+  3. Make sure to submit the pull request to the develop repository.
