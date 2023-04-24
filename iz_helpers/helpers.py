@@ -122,4 +122,5 @@ def clearPrompts():
     return [
         gr.DataFrame.update(value=[[0, "Infinite Zoom. Start over"]]),
         gr.Textbox.update(""),
+        gr.Textbox.update("")
     ]

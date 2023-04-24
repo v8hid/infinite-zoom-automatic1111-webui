@@ -49,6 +49,10 @@ def on_ui_tabs():
                     except Exception:
                         jpr = invalid_prompt
 
+                    main_common_prompt = gr.Textbox(
+                        value=jpr["commonPrompt"], label="Common Prompt"
+                    )
+
                     main_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint step", "prompt"],
@@ -79,7 +83,7 @@ def on_ui_tabs():
                     exportPrompts_button.click(
                         None,
                         _js="exportPrompts",
-                        inputs=[main_prompts, main_negative_prompt],
+                        inputs=[main_common_prompt, main_prompts, main_negative_prompt],
                         outputs=None,
                     )
                     importPrompts_button.upload(
@@ -97,7 +101,7 @@ def on_ui_tabs():
                     clearPrompts_button.click(
                         fn=clearPrompts,
                         inputs=[],
-                        outputs=[main_prompts, main_negative_prompt],
+                        outputs=[main_prompts, main_negative_prompt, main_common_prompt],
                     )
                     with gr.Row():
                         seed = gr.Number(
@@ -237,6 +241,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
         generate_btn.click(
             fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
             inputs=[
+                main_common_prompt,
                 main_prompts,
                 main_negative_prompt,
                 main_outpaint_steps,

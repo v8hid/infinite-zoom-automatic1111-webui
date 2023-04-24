@@ -16,6 +16,7 @@ from .video import write_video
 
 
 def create_zoom(
+    common_prompt,
     prompts_array,
     negative_prompt,
     num_outpainting_steps,
@@ -46,6 +47,7 @@ def create_zoom(
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
         result = create_zoom_single(
+            common_prompt,
             prompts_array,
             negative_prompt,
             num_outpainting_steps,
@@ -76,6 +78,7 @@ def create_zoom(
 
 
 def create_zoom_single(
+    common_prompt,
     prompts_array,
     negative_prompt,
     num_outpainting_steps,
@@ -139,8 +142,9 @@ def create_zoom_single(
             "infzoom_txt2img_model", progress, "Loading Model for txt2img: "
         )
 
+        pr = prompts[min(k for k in prompts.keys() if k >= 0)]
         processed, newseed = renderTxt2Img(
-            prompts[min(k for k in prompts.keys() if k >= 0)],
+            f"{common_prompt}\n{pr}" if common_prompt else pr,
             negative_prompt,
             sampler,
             num_inference_steps,
@@ -203,8 +207,9 @@ def create_zoom_single(
             )
             print("using Custom Exit Image")
         else:
+            pr = prompts[max(k for k in prompts.keys() if k <= i)]
             processed, newseed = renderImg2Img(
-                prompts[max(k for k in prompts.keys() if k <= i)],
+                f"{common_prompt}\n{pr}" if common_prompt else pr,
                 negative_prompt,
                 sampler,
                 num_inference_steps,
