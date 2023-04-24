@@ -149,7 +149,8 @@ def create_zoom_single(
             width,
             height,
         )
-        current_image = processed.images[0]
+        if(len(processed.images) > 0):
+            current_image = processed.images[0]
         current_seed = newseed
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
@@ -219,10 +220,11 @@ def create_zoom_single(
                 inpainting_full_res,
                 inpainting_padding,
             )
-            current_image = processed.images[0]
+            if(len(processed.images) > 0):
+                current_image = processed.images[0]
             current_seed = newseed
-
-        current_image.paste(prev_image, mask=prev_image)
+        if(len(processed.images) > 0):
+            current_image.paste(prev_image, mask=prev_image)
 
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
