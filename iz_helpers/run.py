@@ -9,6 +9,7 @@ from .helpers import (
     closest_upper_divisible_by_eight,
     load_model_from_setting,
     do_upscaleImg,
+    predict_upscalesize
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
 from .image import shrink_and_paste_on_blank
@@ -123,6 +124,14 @@ def create_zoom_single(
     width = closest_upper_divisible_by_eight(outputsizeW)
     height = closest_upper_divisible_by_eight(outputsizeH)
 
+    # smart upscale: only keyframes to upscale, 
+    # therefore change size as state for the hole process
+    if upscale_do:
+        widthInterp,heightInterp,void = predict_upscalesize(outputsizeW, outputsizeH,upscale_by)
+    else:
+        widthInterp = width
+        heightInterp = height
+
     current_image = Image.new(mode="RGBA", size=(width, height))
     mask_image = np.array(current_image)[:, :, 3]
     mask_image = Image.fromarray(255 - mask_image).convert("RGB")
@@ -130,10 +139,15 @@ def create_zoom_single(
     current_seed = seed
 
     if custom_init_image:
-        current_image = custom_init_image.resize(
-            (width, height), resample=Image.LANCZOS
-        )
-        print("using Custom Initial Image")
+        if upscale_do:
+            print(f"using Custom Initial Image, upscaling using {upscaler_name}")
+            current_image = do_upscaleImg(custom_init_image,True,upscaler_name,(width,height))
+
+        else:
+            print(f"using Custom Initial Image, simple resizing to {width} x {height}")
+            current_image = custom_init_image.resize(
+                (width, height), resample=Image.LANCZOS
+            )
     else:
         load_model_from_setting(
             "infzoom_txt2img_model", progress, "Loading Model for txt2img: "
@@ -149,31 +163,32 @@ def create_zoom_single(
             width,
             height,
         )
+
         if(len(processed.images) > 0):
             current_image = processed.images[0]
         current_seed = newseed
 
-    mask_width = math.trunc(width / 4)  # was initially 512px => 128px
-    mask_height = math.trunc(height / 4)  # was initially 512px => 128px
 
     num_interpol_frames = round(video_frame_rate * zoom_speed)
 
     all_frames = []
 
-    if upscale_do and progress:
-        progress(0, desc="upscaling inital image")
+    if upscale_do:
+        if progress: 
+            progress(0, desc="upscaling inital txt2image")
+            all_frames.append(do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by))
+    else:
+        all_frames.append(current_image)
+### end of txt2img
 
-    all_frames.append(
-        do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
-        if upscale_do
-        else current_image
-    )
-
+## begin img2img
     load_model_from_setting(
         "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
     )
 
     for i in range(num_outpainting_steps):
+        mask_width = math.trunc(outputsizeH / 4)  # was initially 512px => 128px
+        mask_height = math.trunc(outputsizeH / 4)  # was initially 512px => 128px
         print_out = (
             "Outpaint step: "
             + str(i + 1)
@@ -198,10 +213,18 @@ def create_zoom_single(
         current_image = current_image.convert("RGB")
 
         if custom_exit_image and ((i + 1) == num_outpainting_steps):
-            current_image = custom_exit_image.resize(
-                (width, height), resample=Image.LANCZOS
-            )
-            print("using Custom Exit Image")
+            if upscale_do:
+                if progress: 
+                    progress(0, desc=f"upscaling Custom Inital image using {upscaler_name}")
+
+                print (f"upscaling Custom Inital image using {upscaler_name}")
+                current_image = do_upscaleImg(custom_exit_image, upscale_do, upscaler_name, (outputsizeW, outputsizeH))
+            else:
+                print("using Custom Exit Image, simple resizing")
+                current_image = custom_exit_image.resize(
+                    (outputsizeW, outputsizeH), resample=Image.LANCZOS
+                )
+
         else:
             processed, newseed = renderImg2Img(
                 prompts[max(k for k in prompts.keys() if k <= i)],
@@ -210,8 +233,8 @@ def create_zoom_single(
                 num_inference_steps,
                 guidance_scale,
                 current_seed,
-                width,
-                height,
+                outputsizeW,
+                outputsizeH,
                 current_image,
                 mask_image,
                 inpainting_denoising_strength,
@@ -220,33 +243,51 @@ def create_zoom_single(
                 inpainting_full_res,
                 inpainting_padding,
             )
+
             if(len(processed.images) > 0):
-                current_image = processed.images[0]
+                    current_image = processed.images[0]
             current_seed = newseed
+
         if(len(processed.images) > 0):
             current_image.paste(prev_image, mask=prev_image)
+### end img2img
 
-        # interpolation steps between 2 inpainted images (=sequential zoom and crop)
+### begin interpolation
+        # from here in case of upscale everything is XL:
+        if upscale_do:
+            if progress: 
+                progress(0, desc="upscaling curr+prevImage")
+
+            current_imageXL  = do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
+            prev_image_fixXL = do_upscaleImg(prev_image_fix, upscale_do, upscaler_name, upscale_by)
+            mask_widthXL = math.trunc(widthInterp / 4)  # was initially 512px => 128px
+            mask_heightXL = math.trunc(heightInterp / 4)  # was initially 512px => 128px
+        else:
+            current_imageXL = current_image
+            mask_widthXL = math.trunc(outputsizeW / 4)  # was initially 512px => 128px
+            mask_heightXL = math.trunc(outputsizeH / 4)  # was initially 512px => 128px
+
+        # interpolation steps between 2 inpainted (upscaled) images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
-            interpol_image = current_image
+            interpol_image = current_imageXL
 
             interpol_width = round(
                 (
                     1
-                    - (1 - 2 * mask_width / width)
+                    - (1 - 2 * mask_widthXL / widthInterp)
                     ** (1 - (j + 1) / num_interpol_frames)
                 )
-                * width
+                * widthInterp
                 / 2
             )
 
             interpol_height = round(
                 (
                     1
-                    - (1 - 2 * mask_height / height)
+                    - (1 - 2 * mask_heightXL / heightInterp)
                     ** (1 - (j + 1) / num_interpol_frames)
                 )
-                * height
+                * heightInterp
                 / 2
             )
 
@@ -254,49 +295,35 @@ def create_zoom_single(
                 (
                     interpol_width,
                     interpol_height,
-                    width - interpol_width,
-                    height - interpol_height,
+                    widthInterp - interpol_width,
+                    heightInterp - interpol_height,
                 )
             )
 
-            interpol_image = interpol_image.resize((width, height))
+   ## WHY?, should be end size?  interpol_image = interpol_image.resize((width, height))
 
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
             interpol_width2 = round(
-                (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
+                (1 - (widthInterp - 2 * mask_widthXL) / (widthInterp - 2 * interpol_width))
                 / 2
-                * width
+                * widthInterp
             )
 
             interpol_height2 = round(
-                (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
+                (1 - (heightInterp - 2 * mask_heightXL) / (heightInterp - 2 * interpol_height))
                 / 2
-                * height
+                * heightInterp
             )
 
             prev_image_fix_crop = shrink_and_paste_on_blank(
-                prev_image_fix, interpol_width2, interpol_height2
+                prev_image_fixXL, interpol_width2, interpol_height2
             )
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
 
-            if upscale_do and progress:
-                progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
+            all_frames.append(interpol_image)
 
-            all_frames.append(
-                do_upscaleImg(interpol_image, upscale_do, upscaler_name, upscale_by)
-                if upscale_do
-                else interpol_image
-            )
-
-        if upscale_do and progress:
-            progress(((i + 1) / num_outpainting_steps), desc="upscaling current")
-
-        all_frames.append(
-            do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
-            if upscale_do
-            else current_image
-        )
+        all_frames.append(current_image)
 
     video_file_name = "infinite_zoom_" + str(int(time.time())) + ".mp4"
     output_path = shared.opts.data.get(

@@ -49,31 +49,46 @@ def load_model_from_setting(model_field_name, progress, progress_desc):
         modules.sd_models.load_model(checkinfo)
 
 
-def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
-    if not upscale_do:
-        return curImg
-
+def predict_upscalesize(width: int, height: int, scale: float):
     # ensure even width and even height for ffmpeg
     # if odd, switch to scale to mode
-    rwidth = round(curImg.width * upscale_by)
-    rheight = round(curImg.height * upscale_by)
-
+    rwidth = round(width * scale)
+    rheight = round(height * scale)
     ups_mode = 2  # upscale_by
+ 
     if (rwidth % 2) == 1:
         ups_mode = 1
         rwidth += 1
     if (rheight % 2) == 1:
         ups_mode = 1
         rheight += 1
+    return rwidth,rheight, ups_mode
 
-    if 1 == ups_mode:
-        print(
-            "Infinite Zoom: aligning output size to even width and height: "
-            + str(rwidth)
-            + " x "
-            + str(rheight),
-            end="\r",
-        )
+def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
+    if not upscale_do:
+        return curImg
+
+    if isinstance(upscale_by, (int,float)):
+        # ensure even width and even height for ffmpeg
+        # if odd, switch to scale to mode
+        rwidth, rheight, ups_mode = predict_upscalesize(curImg.width,curImg.height,upscale_by)
+
+        if 1 == ups_mode:
+            print(
+                "Infinite Zoom: aligning output size to even width and height: "
+                + str(rwidth)
+                + " x "
+                + str(rheight),
+                end="\r",
+            )
+
+    else:
+        if isinstance(upscale_by, tuple): # resize to
+            rwidth,rheight = upscale_by
+            ups_mode = 1
+
+        else:
+            raise f"InfZoom unexpected scaletype:{upscale_by}"
 
     pp = postprocessing_upscale.scripts_postprocessing.PostprocessedImage(curImg)
     ups = postprocessing_upscale.ScriptPostprocessingUpscale()
