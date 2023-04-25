@@ -176,12 +176,6 @@ def create_zoom_single(
                 (width, height), resample=Image.LANCZOS
             )
 
-#    if custom_exit_image and ((i + 1) == num_outpainting_steps):
-#        mask_width = 4  # fade out whole interpol
-#        mask_height =4  # 
-#        mask_width  = width*(20//30)  # fade out whole interpol
-#        mask_height = height*(20//30)  # 
-#    else:
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
 
