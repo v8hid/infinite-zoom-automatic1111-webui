@@ -103,12 +103,6 @@ def create_zoom_single(
     upscale_by,
     progress=None,
 ):
-    # try:
-    #     if gr.Progress() is not None:
-    #         progress = gr.Progress()
-    #         progress(0, desc="Preparing Initial Image")
-    # except Exception:
-    #     pass
     fix_env_Path_ffprobe()
 
     prompts = {}
@@ -300,7 +294,7 @@ def create_zoom_single(
                 )
             )
 
-   ## WHY?, should be end size?  interpol_image = interpol_image.resize((width, height))
+            interpol_image = interpol_image.resize((widthInterp, heightInterp))
 
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
             interpol_width2 = round(
