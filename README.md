@@ -1,4 +1,4 @@
-# Infinite Zoom extension for  [Stable Diffusion WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui/).
+# Infinite Zoom extension for  [Stable Diffusion WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui/).  
 
 <p align="center">     
     <a href="https://discord.gg/v2nHqSrWdW">
@@ -6,7 +6,7 @@
     </a>
 </p>
 
-This is an extension for the AUTOMATIC1111's webui that allows users to create infinite zoom effect videos using stable diffusion outpainting method. 
+This is an extension for the AUTOMATIC1111's (and Vladmandic´s) webui that allows users to create infinite zoom effect videos using stable diffusion outpainting method. 
 <p align="center">
    <img src="https://user-images.githubusercontent.com/62482657/233385585-82d7157e-1438-4cf8-b805-220d96bbbe31.gif" width="332" height="188" />
 </p>
