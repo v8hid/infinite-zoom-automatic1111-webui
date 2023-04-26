@@ -12,7 +12,7 @@ default_prompt = """
         ]
     },
     "commonPromptSuffix":"style by Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2)",
-    "negPrompt":"frames, border, edges, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur bad-artist"
+    "negPrompt":"frames, border, edges, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur, bad-artist"
 }
 """
 
