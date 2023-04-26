@@ -28,87 +28,85 @@ def on_ui_tabs():
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
                 with gr.Tab("Main"):
+                    with gr.Row():
+                        batchcount_slider = gr.Slider(
+                            minimum=1,
+                            maximum=25,
+                            value=shared.opts.data.get("infzoom_batchcount", 1),
+                            step=1,
+                            label="Batch Count",
+                        )
 
-                    batchcount_slider = gr.Slider(
-                        minimum=1,
-                        maximum=25,
-                        value=shared.opts.data.get("infzoom_batchcount", 1),
-                        step=1,
-                        label="Batch Count",
-                    )
-
-                    main_outpaint_steps = gr.Slider(
-                        minimum=2,
-                        maximum=100,
-                        step=1,
-                        value=8,
-                        label="Total Outpaint Steps",
-                        info="The more it is, the longer your videos will be",
-                    )
+                        main_outpaint_steps = gr.Slider(
+                            minimum=2,
+                            maximum=100,
+                            step=1,
+                            value=8,
+                            label="Total Outpaint Steps"
+                        )
 
                     # safe reading json prompt
                     pr = shared.opts.data.get("infzoom_defPrompt", default_prompt)
                     jpr = readJsonPrompt(pr, True)
 
-                    with gr.Accordion(label="Prompt Section"):
-                        main_common_prompt_pre = gr.Textbox(
-                            value=jpr["commonPromptPrefix"], label="Common Prompt Prefix"
-                        )
+                    main_common_prompt_pre = gr.Textbox(
+                        value=jpr["commonPromptPrefix"], label="Common Prompt Prefix"
+                    )
 
-                        main_prompts = gr.Dataframe(
-                            type="array",
-                            headers=["outpaint step", "prompt"],
-                            datatype=["number", "str"],
-                            row_count=1,
-                            col_count=(2, "fixed"),
-                            value=jpr["prompts"],
-                            wrap=True,
-                        )
+                    main_prompts = gr.Dataframe(
+                        type="array",
+                        headers=["outpaint step", "prompt"],
+                        datatype=["number", "str"],
+                        row_count=1,
+                        col_count=(2, "fixed"),
+                        value=jpr["prompts"],
+                        wrap=True,
+                    )
 
-                        main_common_prompt_suf = gr.Textbox(
-                            value=jpr["commonPromptSuffix"], label="Common Prompt Suffix"
-                        )
+                    main_common_prompt_suf = gr.Textbox(
+                        value=jpr["commonPromptSuffix"], label="Common Prompt Suffix"
+                    )
 
-                        main_negative_prompt = gr.Textbox(
-                            value=jpr["negPrompt"], label="Negative Prompt"
-                        )
+                    main_negative_prompt = gr.Textbox(
+                        value=jpr["negPrompt"], label="Negative Prompt"
+                    )
 
-                        # these button will be moved using JS unde the dataframe view as small ones
-                        exportPrompts_button = gr.Button(
-                            value="Export prompts",
-                            variant="secondary",
-                            elem_classes="sm infzoom_tab_butt",
-                            elem_id="infzoom_exP_butt",
-                        )
-                        importPrompts_button = gr.UploadButton(
-                            label="Import prompts",
-                            variant="secondary",
-                            elem_classes="sm infzoom_tab_butt",
-                            elem_id="infzoom_imP_butt",
-                        )
-                        exportPrompts_button.click(
-                            None,
-                            _js="exportPrompts",
-                            inputs=[main_common_prompt_pre, main_prompts, main_common_prompt_suf, main_negative_prompt],
-                            outputs=None
-                        )
-                        importPrompts_button.upload(
-                            fn=putPrompts,
-                            outputs=[main_common_prompt_pre, main_prompts,main_common_prompt_suf , main_negative_prompt],
-                            inputs=[importPrompts_button],
-                        )
+                    # these button will be moved using JS unde the dataframe view as small ones
+                    exportPrompts_button = gr.Button(
+                        value="Export prompts",
+                        variant="secondary",
+                        elem_classes="sm infzoom_tab_butt",
+                        elem_id="infzoom_exP_butt",
+                    )
+                    importPrompts_button = gr.UploadButton(
+                        label="Import prompts",
+                        variant="secondary",
+                        elem_classes="sm infzoom_tab_butt",
+                        elem_id="infzoom_imP_butt",
+                    )
+                    exportPrompts_button.click(
+                        None,
+                        _js="exportPrompts",
+                        inputs=[main_common_prompt_pre, main_prompts, main_common_prompt_suf, main_negative_prompt],
+                        outputs=None
+                    )
+                    importPrompts_button.upload(
+                        fn=putPrompts,
+                        outputs=[main_common_prompt_pre, main_prompts,main_common_prompt_suf , main_negative_prompt],
+                        inputs=[importPrompts_button],
+                    )
 
-                        clearPrompts_button = gr.Button(
-                            value="Clear prompts",
-                            variant="secondary",
-                            elem_classes="sm infzoom_tab_butt",
-                            elem_id="infzoom_clP_butt",
-                        )
-                        clearPrompts_button.click(
-                            fn=clearPrompts,
-                            inputs=[],
-                            outputs=[main_prompts, main_negative_prompt, main_common_prompt_pre, main_common_prompt_suf],
-                        )
+                    clearPrompts_button = gr.Button(
+                        value="Clear prompts",
+                        variant="secondary",
+                        elem_classes="sm infzoom_tab_butt",
+                        elem_id="infzoom_clP_butt",
+                    )
+                    clearPrompts_button.click(
+                        fn=clearPrompts,
+                        inputs=[],
+                        outputs=[main_prompts, main_negative_prompt, main_common_prompt_pre, main_common_prompt_suf],
+                    )
 
                     with gr.Accordion("Render settings"):    
                         with gr.Row():

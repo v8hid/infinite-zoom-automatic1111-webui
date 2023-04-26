@@ -2,7 +2,7 @@
 
 infzoom_titles = {
     "Batch Count":"How many separate videos to create",
-    "Total Outpaint Steps":"Each step generates frame for 1 second at your FPS, while cycling through your array of prompts",
+    "Total Outpaint Steps":"The more it is, the longer your videos will be. Each step generates frame for 1 second at your FPS, while cycling through your array of prompts",
     "Common Prompt Prefix":"Prompt inserted before each step",
     "Common Prompt Suffix":"Prompt inserted after each step",
     "Negative Prompt":"What your model shall avoid",
