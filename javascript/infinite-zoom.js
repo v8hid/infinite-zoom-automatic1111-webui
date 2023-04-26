@@ -1,7 +1,7 @@
 // Function to download data to a file
-function exportPrompts(cp,p, np, filename = "infinite-zoom-prompts.json") {
+function exportPrompts(cppre,p, cpsuf,np, filename = "infinite-zoom-prompts.json") {
 
-    let J = { prompts: p, negPrompt: np, commonPrompt: cp }
+    let J = { prompts: p, negPrompt: np, commonPromptPrefix: cppre, commonPromptSuffix: cpsuf }
 
     var file = new Blob([JSON.stringify(J)], { type: "text/csv" });
     if (window.navigator.msSaveOrOpenBlob) // IE10+

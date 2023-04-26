@@ -68,4 +68,10 @@ def readJsonPrompt(txt, returnFailPrompt=False):
             return invalid_prompt
         raise (f"Infinite Zoom: Corrupted Json structure: {txt[:24]} ...")
 
-    return validatePromptJson_throws(jpr)
+    try:
+        return validatePromptJson_throws(jpr)
+    except Exception:
+        if returnFailPrompt:
+            return invalid_prompt
+        pass
+    

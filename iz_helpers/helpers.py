@@ -100,8 +100,10 @@ def putPrompts(files):
 
             data = readJsonPrompt(file_contents,False)
             return [
+                gr.Textbox.update(data["commonPromptPrefix"]),
                 gr.DataFrame.update(data["prompts"]),
-                gr.Textbox.update(data["negPrompt"]),
+                gr.Textbox.update(data["commonPromptSuffix"]),
+                gr.Textbox.update(data["negPrompt"])
             ]
 
     except Exception:
@@ -112,12 +114,13 @@ def putPrompts(files):
         # error only be shown with raise, so ui gets broken.
         #asyncio.run(showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5))
 
-        return [gr.DataFrame.update(), gr.Textbox.update()]
+        return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update()]
 
 
 def clearPrompts():
     return [
         gr.DataFrame.update(value=[[0, "Infinite Zoom. Start over"]]),
+        gr.Textbox.update(""),
         gr.Textbox.update(""),
         gr.Textbox.update("")
     ]
