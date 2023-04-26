@@ -42,3 +42,14 @@ def open_image(image_path):
         img = Image.open(image_path)
     
     return img
+
+def apply_alpha_mask(current_image, mask_image):
+
+    # Resize the mask to match the current image size
+    mask_image = mask_image.resize(current_image.size)
+
+    # Apply the mask as the alpha layer of the current image
+    result_image = current_image.copy()
+    result_image.putalpha(mask_image.convert('L')) # convert to grayscale
+
+    return result_image

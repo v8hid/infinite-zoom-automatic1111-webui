@@ -14,7 +14,7 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
         frames = frames[::-1]
 
     # Drop missformed frames
-    frames = [frame for frame in frames if frame.size == frames[0].size]
+    frames = [frame.convert("RGBA") for frame in frames if frame.size == frames[0].size]
 
     # Create an imageio video writer, avoid block size of 512.
     writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)
