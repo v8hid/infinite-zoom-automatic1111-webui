@@ -123,3 +123,14 @@ def clearPrompts():
         gr.DataFrame.update(value=[[0, "Infinite Zoom. Start over"]]),
         gr.Textbox.update(""),
     ]
+
+def value_to_bool(value):
+    if isinstance(value, bool):
+        return value
+    elif isinstance(value, str):
+        if value.lower() in ("true", "false"):
+            return value.lower() == "true"
+    elif isinstance(value, int):
+        if value in (0, 1):
+            return bool(value)
+    return False

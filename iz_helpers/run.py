@@ -8,10 +8,10 @@ from .helpers import (
     fix_env_Path_ffprobe,
     closest_upper_divisible_by_eight,
     load_model_from_setting,
-    do_upscaleImg,
+    do_upscaleImg,value_to_bool
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
-from .image import shrink_and_paste_on_blank, open_image, apply_alpha_mask
+from .image import shrink_and_paste_on_blank, open_image, apply_alpha_mask, draw_gradient_ellipse, resize_and_crop_image
 from .video import write_video
 
 
@@ -125,7 +125,7 @@ def create_zoom_single(
             prompts[key] = value
             prompt_images[key] = file_loc
             prompt_alpha_mask_images[key] = alpha_mask_loc
-            prompt_image_is_keyframe[key] = is_keyframe
+            prompt_image_is_keyframe[key] = value_to_bool(is_keyframe)
         except ValueError:
             pass
     assert len(prompts_array) > 0, "prompts is empty"
@@ -143,9 +143,7 @@ def create_zoom_single(
     extra_frames = 0
 
     if custom_init_image:
-        current_image = custom_init_image.resize(
-            (width, height), resample=Image.LANCZOS
-        )
+        current_image = resize_and_crop_image(custom_init_image, width, height)
         print("using Custom Initial Image")
     else:
         if prompt_images[min(k for k in prompt_images.keys() if k >= 0)] == "":
@@ -165,14 +163,8 @@ def create_zoom_single(
             )
             current_image = processed.images[0]
         else:
-            current_image = open_image(prompt_images[min(k for k in prompt_images.keys() if k >= 0)]).resize(
-                (width, height), resample=Image.LANCZOS
-            )
-
-    # apply available alpha mask
-    if prompt_alpha_mask_images[min(k for k in prompt_alpha_mask_images.keys() if k >= 0)] != "":
-        current_image = apply_alpha_mask(current_image, open_image(prompt_alpha_mask_images[min(k for k in prompt_alpha_mask_images.keys() if k >= 0)]))
-
+            current_image = open_image(prompt_images[min(k for k in prompt_images.keys() if k >= 0)])
+            current_image = resize_and_crop_image(current_image, width, height)
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
     mask_height = math.trunc(height / 4)  # was initially 512px => 128px
@@ -208,6 +200,14 @@ def create_zoom_single(
         if progress:
             progress(((i + 1) / num_outpainting_steps), desc=print_out)
 
+        # apply available alpha mask of previous image
+        if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
+            current_image = apply_alpha_mask(current_image, open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))]))
+        else:
+            #generate automatic alpha mask
+            current_image_gradient_ratio = 0.615 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.89),0.1)
+            current_image = apply_alpha_mask(current_image, draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 3.0).convert("RGB"))
+
         prev_image_fix = current_image
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
         current_image = prev_image
@@ -219,13 +219,11 @@ def create_zoom_single(
         # inpainting step
         current_image = current_image.convert("RGB")
 
-        paste_previous_image = prompt_image_is_keyframe[max(k for k in prompt_image_is_keyframe.keys() if k <= (i + 1))]
+        paste_previous_image = not prompt_image_is_keyframe[max(k for k in prompt_image_is_keyframe.keys() if k <= (i + 1))]
         
         # Custom and specified images work like keyframes
         if custom_exit_image and (i + 1) >= (num_outpainting_steps + extra_frames):
-            current_image = custom_exit_image.resize(
-                (width, height), resample=Image.LANCZOS
-            )
+            current_image = resize_and_crop_image(custom_exit_image, width, height)
             print("using Custom Exit Image")
         else:
             if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))] == "":
@@ -251,13 +249,16 @@ def create_zoom_single(
                 #current_image.paste(prev_image, mask=prev_image)
                 paste_previous_image = True
             else:
-                current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))]).resize(
-                    (width, height), resample=Image.LANCZOS
-                )
+                # use prerendered image, known as keyframe. Resize to target size
+                current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))])
+                current_image = resize_and_crop_image(current_image, width, height)
 
-        # apply available alpha mask
-        if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-            current_image = apply_alpha_mask(current_image, open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))]))
+        # apply available alpha mask of previous image
+        #if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
+        #    current_image = apply_alpha_mask(current_image, open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))]))
+        #else:
+        #    current_image_gradient_ratio = 0.65 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
+        #    current_image = draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 1.8).convert("RGB")
 
         # paste previous image on current image
         if paste_previous_image:

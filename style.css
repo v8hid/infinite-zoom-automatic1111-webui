@@ -8,3 +8,16 @@
     flex: 0 0 0%;
     width: 0;
 }
+.gradio-container-3-23-0 .gradio-dataframe input {
+    height: 90%;
+    width: 90%;
+}
+.gradio-container-3-23-0 .gradio-dataframe .scroll-hide {
+    scrollbar-width: unset;
+}
+#component-2115, #component-2065 .gradio-column:nth-child(1) {
+    flex-grow: .66 !important;
+}
+#component-2115 .gradio-video, #component-2065 .gradio-column:nth-child(1) .gradio-video {
+    height: auto !important;
+}
