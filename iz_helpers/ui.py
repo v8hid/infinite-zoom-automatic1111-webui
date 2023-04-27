@@ -42,7 +42,7 @@ def on_ui_tabs():
                             maximum=100,
                             step=1,
                             value=8,
-                            label="Total Outpaint Steps"
+                            label="Total Outpaint Steps",
                         )
 
                     # safe reading json prompt
@@ -87,12 +87,22 @@ def on_ui_tabs():
                     exportPrompts_button.click(
                         None,
                         _js="exportPrompts",
-                        inputs=[main_common_prompt_pre, main_prompts, main_common_prompt_suf, main_negative_prompt],
-                        outputs=None
+                        inputs=[
+                            main_common_prompt_pre,
+                            main_prompts,
+                            main_common_prompt_suf,
+                            main_negative_prompt,
+                        ],
+                        outputs=None,
                     )
                     importPrompts_button.upload(
                         fn=putPrompts,
-                        outputs=[main_common_prompt_pre, main_prompts,main_common_prompt_suf , main_negative_prompt],
+                        outputs=[
+                            main_common_prompt_pre,
+                            main_prompts,
+                            main_common_prompt_suf,
+                            main_negative_prompt,
+                        ],
                         inputs=[importPrompts_button],
                     )
 
@@ -105,10 +115,15 @@ def on_ui_tabs():
                     clearPrompts_button.click(
                         fn=clearPrompts,
                         inputs=[],
-                        outputs=[main_prompts, main_negative_prompt, main_common_prompt_pre, main_common_prompt_suf],
+                        outputs=[
+                            main_prompts,
+                            main_negative_prompt,
+                            main_common_prompt_pre,
+                            main_common_prompt_suf,
+                        ],
                     )
 
-                    with gr.Accordion("Render settings"):    
+                    with gr.Accordion("Render settings"):
                         with gr.Row():
                             seed = gr.Number(
                                 label="Seed", value=-1, precision=0, interactive=True
@@ -150,9 +165,12 @@ def on_ui_tabs():
                                 label="Sampling Steps for each outpaint",
                             )
                         with gr.Row():
-                            init_image = gr.Image(type="pil", label="Custom initial image")
-                            exit_image = gr.Image(type="pil", label="Custom exit image")
-
+                            init_image = gr.Image(
+                                type="pil", label="Custom initial image"
+                            )
+                            exit_image = gr.Image(
+                                type="pil", label="Custom exit image", visible=False
+                            )
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
