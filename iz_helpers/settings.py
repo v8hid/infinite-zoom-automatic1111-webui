@@ -1,19 +1,19 @@
+import gradio as gr
 import modules.shared as shared
 from .static_variables import default_prompt
-import gradio as gr
 
 
 def on_ui_settings():
     section = ("infinite-zoom", "Infinite Zoom")
 
     shared.opts.add_option(
-        "outputs" "infzoom_outpath",
+        "infzoom_outpath",
         shared.OptionInfo(
-            "",
+            "outputs",
             "Path where to store your infinite video. Default is Outputs",
             gr.Textbox,
             {"interactive": True},
-            section=section,
+            section=section,    
         ),
     )
 
@@ -93,3 +93,18 @@ def on_ui_settings():
             section=section,
         ),
     )
+    
+    
+    shared.opts.add_option(
+        "infzoom_collectAllResources",
+        shared.OptionInfo(
+            False,
+            "Store all images (txt2img, init_image,exit_image, inpainting, interpolation) and the movie into one folder in your OUTPUT Path",
+            gr.Checkbox,
+            {"interactive": True},
+            section=section,
+        ),
+    )
+        
+    
+    
