@@ -3,7 +3,7 @@ function exportPrompts(cppre,p, cpsuf,np, filename = "infinite-zoom-prompts.json
 
     let J = { prompts: p, negPrompt: np, commonPromptPrefix: cppre, commonPromptSuffix: cpsuf }
 
-    var file = new Blob([JSON.stringify(J)], { type: "text/csv" });
+    var file = new Blob([JSON.stringify(J,null,2)], { type: "text/csv" });
     if (window.navigator.msSaveOrOpenBlob) // IE10+
         window.navigator.msSaveOrOpenBlob(file, filename);
     else { // Others
