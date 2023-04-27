@@ -93,7 +93,8 @@ def on_ui_settings():
             section=section,
         ),
     )
-
+    
+    
     shared.opts.add_option(
         "infzoom_collectAllResources",
         shared.OptionInfo(
@@ -104,3 +105,6 @@ def on_ui_settings():
             section=section,
         ),
     )
+        
+    
+    
