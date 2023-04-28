@@ -14,6 +14,7 @@ from .sd_helpers import renderImg2Img, renderTxt2Img
 from .image import shrink_and_paste_on_blank
 from .video import write_video
 
+
 def create_zoom(
     common_prompt_pre,
     prompts_array,
@@ -78,40 +79,65 @@ def create_zoom(
     return result
 
 
-
 def prepare_output_path():
+    isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
+    output_path = shared.opts.data.get("infzoom_outpath", "output")
 
-    isCollect = shared.opts.data.get("infzoom_collectAllResources",False)
-    output_path = shared.opts.data.get(
-        "infzoom_outpath", "output"
-    )
-    
     save_path = os.path.join(
         output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
     )
 
     if isCollect:
-        save_path = os.path.join(save_path,"iz_collect" + str(int(time.time())))
+        save_path = os.path.join(save_path, "iz_collect" + str(int(time.time())))
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    video_filename = os.path.join(save_path,"infinite_zoom_" + str(int(time.time())) + ".mp4")
+    video_filename = os.path.join(
+        save_path, "infinite_zoom_" + str(int(time.time())) + ".mp4"
+    )
 
-    return {"isCollect":isCollect,"save_path":save_path,"video_filename":video_filename}
-        
+    return {
+        "isCollect": isCollect,
+        "save_path": save_path,
+        "video_filename": video_filename,
+    }
 
-def  save2Collect(img, out_config, name):
+
+def save2Collect(img, out_config, name):
     if out_config["isCollect"]:
         img.save(f'{out_config["save_path"]}/{name}.png')
+
 
 def frame2Collect(all_frames, out_config):
     save2Collect(all_frames[-1], out_config, f"frame_{len(all_frames)}.png")
 
+
 def frames2Collect(all_frames, out_config):
-    for i,f in enumerate(all_frames):
+    for i, f in enumerate(all_frames):
         save2Collect(f, out_config, f"frame_{i}.png")
-    
+
+
+def crop_inner_image(outpainted_img, width_offset, height_offset):
+    width, height = outpainted_img.size
+
+    center_x, center_y = int(width / 2), int(height / 2)
+
+    # Crop the image to the center
+    cropped_img = outpainted_img.crop(
+        (
+            center_x - width_offset,
+            center_y - height_offset,
+            center_x + width_offset,
+            center_y + height_offset,
+        )
+    )
+    prev_step_img = cropped_img.resize((width, height), resample=Image.LANCZOS)
+    # resized_img = resized_img.filter(ImageFilter.SHARPEN)
+
+    return prev_step_img
+
+
 def create_zoom_single(
     common_prompt_pre,
     prompts_array,
@@ -148,11 +174,10 @@ def create_zoom_single(
     # except Exception:
     #     pass
     fix_env_Path_ffprobe()
-
     out_config = prepare_output_path()
 
     prompts = {}
-    
+
     for x in prompts_array:
         try:
             key = int(x[0])
@@ -160,7 +185,7 @@ def create_zoom_single(
             prompts[key] = value
         except ValueError:
             pass
-        
+
     assert len(prompts_array) > 0, "prompts is empty"
 
     width = closest_upper_divisible_by_eight(outputsizeW)
@@ -195,10 +220,9 @@ def create_zoom_single(
             width,
             height,
         )
-        if(len(processed.images) > 0):
+        if len(processed.images) > 0:
             current_image = processed.images[0]
             save2Collect(current_image, out_config, f"txt2img.png")
-
         current_seed = newseed
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
@@ -210,12 +234,6 @@ def create_zoom_single(
 
     if upscale_do and progress:
         progress(0, desc="upscaling inital image")
-
-    all_frames.append(
-        do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
-        if upscale_do
-        else current_image
-    )
 
     load_model_from_setting(
         "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
@@ -238,7 +256,7 @@ def create_zoom_single(
         save2Collect(prev_image_fix, out_config, f"prev_image_fix_{i}.png")
 
         prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
-        save2Collect(prev_image, out_config, f"prev_image_{1}.png")
+        save2Collect(prev_image, out_config, f"prev_image_{i}.png")
 
         current_image = prev_image
 
@@ -246,7 +264,6 @@ def create_zoom_single(
         mask_image = np.array(current_image)[:, :, 3]
         mask_image = Image.fromarray(255 - mask_image).convert("RGB")
         save2Collect(mask_image, out_config, f"mask_image_{i}.png")
-
 
         # inpainting step
         current_image = current_image.convert("RGB")
@@ -276,13 +293,26 @@ def create_zoom_single(
                 inpainting_full_res,
                 inpainting_padding,
             )
-            if(len(processed.images) > 0):
+            if len(processed.images) > 0:
                 current_image = processed.images[0]
             current_seed = newseed
-        if(len(processed.images) > 0):
-            current_image.paste(prev_image, mask=prev_image)
+        if len(processed.images) > 0:
+            # current_image.paste(prev_image, mask=prev_image)
             save2Collect(current_image, out_config, f"curr_prev_paste_{i}.png")
-
+        if True or i > 0:
+            correction_crop = crop_inner_image(current_image, mask_width, mask_height)
+            prev_image_fix = correction_crop
+            # paste_x = (current_image.width - prev_image.width) // 2
+            # paste_y = (current_image.height - prev_image.height) // 2
+            # current_image.paste(prev_image, (paste_x, paste_y), mask=prev_image)
+            # replace the prev frame with current croped
+        all_frames.append(
+            do_upscaleImg(
+                prev_image_fix.convert("RGB"), upscale_do, upscaler_name, upscale_by
+            )
+            if upscale_do
+            else prev_image_fix.convert("RGB")
+        )
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             interpol_image = current_image
@@ -316,10 +346,10 @@ def create_zoom_single(
                     height - interpol_height,
                 )
             )
-            save2Collect(interpol_image, out_config, f"interpol_crop_{i}_{j}.png")
+            # save2Collect(interpol_image, out_config, f"interpol_crop_{i}_{j}.png")
 
             interpol_image = interpol_image.resize((width, height))
-            save2Collect(interpol_image, out_config, f"interpol_resize_{i}_{j}.png")
+            # save2Collect(interpol_image, out_config, f"interpol_resize_{i}_{j}.png")
 
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
             interpol_width2 = round(
@@ -337,10 +367,10 @@ def create_zoom_single(
             prev_image_fix_crop = shrink_and_paste_on_blank(
                 prev_image_fix, interpol_width2, interpol_height2
             )
-            save2Collect(prev_image_fix, out_config, f"prev_image_fix_crop_{i}_{j}.png")
+            # save2Collect(prev_image_fix, out_config, f"prev_image_fix_crop_{i}_{j}.png")
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
-            save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
+            # save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
 
             if upscale_do and progress:
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
