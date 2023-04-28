@@ -47,17 +47,14 @@
     "negPrompt": {
       "type": "string"
     },
-    "commonPromptPrefix": {
+    "prePrompt": {
       "type": "string"
     },
-    "commonPromptSuffix": {
+    "postPrompt": {
       "type": "string"
     }
   },
   "required": [
-    "prompts",
-    "negPrompt",
-    "commonPromptPrefix",
-    "commonPromptSuffix"
+    "prompts"
   ]
 }
