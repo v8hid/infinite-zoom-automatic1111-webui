@@ -59,7 +59,7 @@ def on_ui_tabs():
                         jpr = invalid_prompt
 
                     main_common_prompt_pre = gr.Textbox(
-                        value=jpr["commonPromptPrefix"], label="Common Prompt Prefix"
+                        value=jpr["prePrompt"], label="Common Prompt Prefix"
                     )
                     main_prompts = gr.Dataframe(
                         type="array",
@@ -72,7 +72,7 @@ def on_ui_tabs():
                     )
 
                     main_common_prompt_suf = gr.Textbox(
-                        value=jpr["commonPromptSuffix"], label="Common Prompt Suffix"
+                        value=jpr["postPrompt"], label="Common Prompt Suffix"
                     )
 
                     main_negative_prompt = gr.Textbox(
