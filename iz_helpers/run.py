@@ -245,7 +245,7 @@ def save2Collect(img, out_config, name):
 
 
 def frame2Collect(all_frames, out_config):
-    save2Collect(all_frames[-1], out_config, f"frame_{len(all_frames)}.png")
+    save2Collect(all_frames[-1], out_config, f"frame_{len(all_frames)}")
 
 def prepare_output_path():
     isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
@@ -517,7 +517,7 @@ def create_zoom_single(
             else current_image
         )
 
-    frames2Collect(all_frames, out_config)
+    # frames2Collect(all_frames, out_config)
 
     write_video(
         out_config["video_filename"],
