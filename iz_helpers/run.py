@@ -214,32 +214,35 @@ def create_zoom(
     return result
 
 
-
 def prepare_output_path():
+    isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
+    output_path = shared.opts.data.get("infzoom_outpath", "output")
 
-    isCollect = shared.opts.data.get("infzoom_collectAllResources",False)
-    output_path = shared.opts.data.get(
-        "infzoom_outpath", "output"
-    )
-    
     save_path = os.path.join(
         output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
     )
 
     if isCollect:
-        save_path = os.path.join(save_path,"iz_collect" + str(int(time.time())))
+        save_path = os.path.join(save_path, "iz_collect" + str(int(time.time())))
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    video_filename = os.path.join(save_path,"infinite_zoom_" + str(int(time.time())) + ".mp4")
+    video_filename = os.path.join(
+        save_path, "infinite_zoom_" + str(int(time.time())) + ".mp4"
+    )
 
-    return {"isCollect":isCollect,"save_path":save_path,"video_filename":video_filename}
-        
+    return {
+        "isCollect": isCollect,
+        "save_path": save_path,
+        "video_filename": video_filename,
+    }
 
-def  save2Collect(img, out_config, name):
+
+def save2Collect(img, out_config, name):
     if out_config["isCollect"]:
         img.save(f'{out_config["save_path"]}/{name}.png')
+
 
 def frame2Collect(all_frames, out_config):
     save2Collect(all_frames[-1], out_config, f"frame_{len(all_frames)}.png")
@@ -321,8 +324,6 @@ def create_zoom_single(
     fix_env_Path_ffprobe()
     out_config = prepare_output_path()
 
-    out_config = prepare_output_path()
-
     prompts = {}
     prompt_images = {}
     prompt_alpha_mask_images = {}
@@ -341,7 +342,7 @@ def create_zoom_single(
             prompt_image_is_keyframe[key] = value_to_bool(is_keyframe)
         except ValueError:
             pass
-        
+
     assert len(prompts_array) > 0, "prompts is empty"
     print(str(len(prompts)) + " prompts found")
     print(str(len(prompt_images)) + " prompts Images found")
@@ -473,7 +474,7 @@ def create_zoom_single(
                     height - interpol_height,
                 )
             )
-            save2Collect(interpol_image, out_config, f"interpol_crop_{i}_{j}.png")
+            # save2Collect(interpol_image, out_config, f"interpol_crop_{i}_{j}.png")
 
             interpol_image = interpol_image.resize((width, height))
             save2Collect(interpol_image, out_config, f"interpol_resize_{i}_{j}.png")
@@ -496,7 +497,7 @@ def create_zoom_single(
             )
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
-            save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
+            # save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
 
             if upscale_do and progress:
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
