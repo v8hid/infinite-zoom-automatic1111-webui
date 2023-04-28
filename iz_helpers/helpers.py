@@ -105,9 +105,9 @@ def putPrompts(files):
 
             data = readJsonPrompt(file_contents,False)
             return [
-                gr.Textbox.update(data["commonPromptPrefix"]),
+                gr.Textbox.update(data["prePrompt"]),
                 gr.DataFrame.update(data["prompts"]),
-                gr.Textbox.update(data["commonPromptSuffix"]),
+                gr.Textbox.update(data["postPromt"]),
                 gr.Textbox.update(data["negPrompt"])
             ]
 

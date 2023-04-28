@@ -4,7 +4,7 @@ import modules.sd_samplers
 
 default_prompt = """
 {
-    "commonPromptPrefix":"<lora:epiNoiseoffset_v2:0.6> ",
+    "prePrompt":"<lora:epiNoiseoffset_v2:0.6> ",
     "prompts":{
         "headers":["outpaint steps","prompt","image location","blend mask location", "is keyframe"],
         "data":[
@@ -14,13 +14,13 @@ default_prompt = """
 			[5, "a Verdant canopy","","",false]
         ]
     },
-    "commonPromptSuffix":"style by Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2)",
+    "postPrompt":"style by Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2)",
     "negPrompt":"frames, border, edges, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur, bad-artist"
 }
 """
 
 empty_prompt = (
-    '{"prompts":{"data":[],"headers":["outpaint steps","prompt","image location", "blend mask location", "is keyframe"]},"negPrompt":"", commonPromptPrefix:"", commonPromptSuffix:""}'
+    '{"prompts":{"data":[],"headers":["outpaint steps","prompt","image location", "blend mask location", "is keyframe"]},"negPrompt":"", prePrompt:"", postPrompt:""}'
 )
 
 invalid_prompt = {
@@ -29,8 +29,8 @@ invalid_prompt = {
         "headers": ["outpaint steps", "prompt","image location","blend mask location", "is keyframe"],
     },
     "negPrompt": "Invalid prompt-json",
-    "commonPromptPrefix": "Invalid prompt",
-    "commonPromptSuffix": "Invalid prompt",
+    "prePromp": "Invalid prompt",
+    "postPrompt": "Invalid prompt"
 }
 
 available_samplers = [
