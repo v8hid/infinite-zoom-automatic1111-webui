@@ -15,6 +15,99 @@ from .image import shrink_and_paste_on_blank
 from .video import write_video
 
 
+def outpaint_steps(
+    width,
+    height,
+    common_prompt_pre,
+    common_prompt_suf,
+    prompts,
+    negative_prompt,
+    seed,
+    sampler,
+    num_inference_steps,
+    guidance_scale,
+    inpainting_denoising_strength,
+    inpainting_mask_blur,
+    inpainting_fill_mode,
+    inpainting_full_res,
+    inpainting_padding,
+    init_img,
+    outpaint_steps,
+    out_config,
+    mask_width,
+    mask_height,
+    custom_exit_image,
+    frame_correction=True,
+):
+    main_frames = [init_img.convert("RGB")]
+    for i in range(outpaint_steps):
+        print_out = (
+            "Outpaint step: "
+            + str(i + 1)
+            + " / "
+            + str(outpaint_steps)
+            + " Seed: "
+            + str(seed)
+        )
+        print(print_out)
+        current_image = main_frames[-1]
+        prev_image_fix = current_image
+        # save2Collect(prev_image_fix, out_config, f"prev_image_fix_{i}.png")
+
+        prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
+        # save2Collect(prev_image, out_config, f"prev_image_{i}.png")
+
+        current_image = prev_image
+
+        # create mask (black image with white mask_width width edges)
+        mask_image = np.array(current_image)[:, :, 3]
+        mask_image = Image.fromarray(255 - mask_image).convert("RGB")
+        # save2Collect(mask_image, out_config, f"mask_image_{i}.png")
+
+        if custom_exit_image and ((i + 1) == outpaint_steps):
+            current_image = custom_exit_image.resize(
+                (width, height), resample=Image.LANCZOS
+            )
+            main_frames.append(current_image.convert("RGB"))
+            print("using Custom Exit Image")
+            # save2Collect(current_image, out_config, f"exit_img.png")
+        else:
+            pr = prompts[max(k for k in prompts.keys() if k <= i)]
+            processed, newseed = renderImg2Img(
+                f"{common_prompt_pre}\n{pr}\n{common_prompt_suf}".strip(),
+                negative_prompt,
+                sampler,
+                num_inference_steps,
+                guidance_scale,
+                seed,
+                width,
+                height,
+                current_image,
+                mask_image,
+                inpainting_denoising_strength,
+                inpainting_mask_blur,
+                inpainting_fill_mode,
+                inpainting_full_res,
+                inpainting_padding,
+            )
+            if len(processed.images) > 0:
+                main_frames.append(processed.images[0].convert("RGB"))
+            seed = newseed
+        if frame_correction and inpainting_mask_blur > 0:
+            corrected_frame = crop_inner_image(
+                main_frames[i + 1], mask_width, mask_height
+            )
+            save2Collect(current_image, out_config, f"corrected_{i}")
+            main_frames[i] = corrected_frame
+
+        # else TEST pasting differance
+        # current_image.paste(prev_image, mask=prev_image)
+    frames2Collect(main_frames, out_config)
+    print(out_config)
+    print("length: ", len(main_frames))
+    return main_frames
+
+
 def create_zoom(
     common_prompt_pre,
     prompts_array,
@@ -110,12 +203,12 @@ def save2Collect(img, out_config, name):
 
 
 def frame2Collect(all_frames, out_config):
-    save2Collect(all_frames[-1], out_config, f"frame_{len(all_frames)}.png")
+    save2Collect(all_frames[-1], out_config, f"frame_{len(all_frames)}")
 
 
 def frames2Collect(all_frames, out_config):
     for i, f in enumerate(all_frames):
-        save2Collect(f, out_config, f"frame_{i}.png")
+        save2Collect(f, out_config, f"frame_{i}")
 
 
 def crop_inner_image(outpainted_img, width_offset, height_offset):
@@ -201,7 +294,7 @@ def create_zoom_single(
         current_image = custom_init_image.resize(
             (width, height), resample=Image.LANCZOS
         )
-        save2Collect(current_image, out_config, f"init_img.png")
+        # save2Collect(current_image, out_config, f"init_img.png")
         print("using Custom Initial Image")
 
     else:
@@ -222,7 +315,7 @@ def create_zoom_single(
         )
         if len(processed.images) > 0:
             current_image = processed.images[0]
-            save2Collect(current_image, out_config, f"txt2img.png")
+            # save2Collect(current_image, out_config, f"txt2img.png")
         current_seed = newseed
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
@@ -238,85 +331,43 @@ def create_zoom_single(
     load_model_from_setting(
         "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
     )
-
-    for i in range(num_outpainting_steps):
-        print_out = (
-            "Outpaint step: "
-            + str(i + 1)
-            + " / "
-            + str(num_outpainting_steps)
-            + " Seed: "
-            + str(current_seed)
-        )
-        print(print_out)
-        if progress:
-            progress(((i + 1) / num_outpainting_steps), desc=print_out)
-
-        prev_image_fix = current_image
-        save2Collect(prev_image_fix, out_config, f"prev_image_fix_{i}.png")
-
-        prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
-        save2Collect(prev_image, out_config, f"prev_image_{i}.png")
-
-        current_image = prev_image
-
-        # create mask (black image with white mask_width width edges)
-        mask_image = np.array(current_image)[:, :, 3]
-        mask_image = Image.fromarray(255 - mask_image).convert("RGB")
-        save2Collect(mask_image, out_config, f"mask_image_{i}.png")
-
-        # inpainting step
-        current_image = current_image.convert("RGB")
-
-        if custom_exit_image and ((i + 1) == num_outpainting_steps):
-            current_image = custom_exit_image.resize(
-                (width, height), resample=Image.LANCZOS
-            )
-            print("using Custom Exit Image")
-            save2Collect(current_image, out_config, f"exit_img.png")
-        else:
-            pr = prompts[max(k for k in prompts.keys() if k <= i)]
-            processed, newseed = renderImg2Img(
-                f"{common_prompt_pre}\n{pr}\n{common_prompt_suf}".strip(),
-                negative_prompt,
-                sampler,
-                num_inference_steps,
-                guidance_scale,
-                current_seed,
-                width,
-                height,
-                current_image,
-                mask_image,
-                inpainting_denoising_strength,
-                inpainting_mask_blur,
-                inpainting_fill_mode,
-                inpainting_full_res,
-                inpainting_padding,
-            )
-            if len(processed.images) > 0:
-                current_image = processed.images[0]
-            current_seed = newseed
-        if len(processed.images) > 0:
-            # current_image.paste(prev_image, mask=prev_image)
-            save2Collect(current_image, out_config, f"curr_prev_paste_{i}.png")
-        if True or i > 0:
-            correction_crop = crop_inner_image(current_image, mask_width, mask_height)
-            prev_image_fix = correction_crop
-            # paste_x = (current_image.width - prev_image.width) // 2
-            # paste_y = (current_image.height - prev_image.height) // 2
-            # current_image.paste(prev_image, (paste_x, paste_y), mask=prev_image)
-            # replace the prev frame with current croped
-        all_frames.append(
-            do_upscaleImg(
-                prev_image_fix.convert("RGB"), upscale_do, upscaler_name, upscale_by
-            )
-            if upscale_do
-            else prev_image_fix.convert("RGB")
-        )
+    main_frames = outpaint_steps(
+        width,
+        height,
+        common_prompt_pre,
+        common_prompt_suf,
+        prompts,
+        negative_prompt,
+        seed,
+        sampler,
+        num_inference_steps,
+        guidance_scale,
+        inpainting_denoising_strength,
+        inpainting_mask_blur,
+        inpainting_fill_mode,
+        inpainting_full_res,
+        inpainting_padding,
+        current_image,
+        num_outpainting_steps,
+        out_config,
+        mask_width,
+        mask_height,
+        custom_exit_image,
+    )
+    for i in range(len(main_frames) - 1):
+        # TODO: fix upscale
+        # all_frames.append(
+        #     do_upscaleImg(
+        #         prev_image_fix.convert("RGB"), upscale_do, upscaler_name, upscale_by
+        #     )
+        #     if upscale_do
+        #     else prev_image_fix.convert("RGB")
+        # )
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
+            current_image = main_frames[i + 1]
             interpol_image = current_image
-            save2Collect(interpol_image, out_config, f"interpol_img_{i}_{j}].png")
+            # save2Collect(interpol_image, out_config, f"interpol_img_{i}_{j}].png")
 
             interpol_width = round(
                 (
@@ -365,7 +416,7 @@ def create_zoom_single(
             )
 
             prev_image_fix_crop = shrink_and_paste_on_blank(
-                prev_image_fix, interpol_width2, interpol_height2
+                main_frames[i], interpol_width2, interpol_height2
             )
             # save2Collect(prev_image_fix, out_config, f"prev_image_fix_crop_{i}_{j}.png")
 
@@ -390,7 +441,7 @@ def create_zoom_single(
             else current_image
         )
 
-    frames2Collect(all_frames, out_config)
+    # frames2Collect(all_frames, out_config)
 
     write_video(
         out_config["video_filename"],
