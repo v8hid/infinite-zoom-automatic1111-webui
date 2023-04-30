@@ -17,10 +17,10 @@ def completeOptionals(j):
             j["prompts"]["negPrompt"]=""
             
         if "prePrompt" not in j:
-            j["prompts"]["prePrompt"]=""
+            j["prePrompt"]=""
             
         if "postPrompt" not in j:
-            j["prompts"]["postPrompt"]=""
+            j["postPrompt"]=""
 
     return j
 
