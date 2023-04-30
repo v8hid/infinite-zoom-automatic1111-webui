@@ -2,7 +2,7 @@
 
 infzoom_titles = {
     "Batch Count":"How many separate videos to create",
-    "Total Outpaint Steps":"The more it is, the longer your videos will be. Each step generates frame for 1 second at your FPS, while cycling through your array of prompts",
+    "Total video length [s]":"For each seconds frame (FPS) will be generated. Define prompts at which time they should start wihtin this duration.",
     "Common Prompt Prefix":"Prompt inserted before each step",
     "Common Prompt Suffix":"Prompt inserted after each step",
     "Negative Prompt":"What your model shall avoid",
@@ -12,9 +12,8 @@ infzoom_titles = {
     "Custom initial image":"An image at the end resp. begin of your movie, depending or ZoomIn or Out",
     "Custom exit image":"An image at the end resp. begin of your movie, depending or ZoomIn or Out",
     "Zoom Speed":"Varies additional frames per second",
-    
-
-
+    "Start at second [0,1,...]": "At which time the prompt has to be occure. We need at least one prompt starting at time 0",
+	"Generate video": "Start rendering. If it´s disabled the prompt table is invalid, check we have a start prompt at time 0"
 }
 
 

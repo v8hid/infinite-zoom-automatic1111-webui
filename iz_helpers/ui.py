@@ -40,23 +40,16 @@ def on_ui_tabs():
                         )
 
                         main_outpaint_steps = gr.Slider(
-                            minimum=1,
+                            minimum=2,
                             maximum=100,
                             step=1,
                             value=8,
-                            label="Total Outpaint Steps",
-                            info="The more it is, the longer your videos will be",
+                            label="Total video length [s]",
                         )
 
                     # safe reading json prompt
                     pr = shared.opts.data.get("infzoom_defPrompt", default_prompt)
-                    if not pr:
-                        pr = empty_prompt
-                    try:
-                        jpr = json.loads(pr)
-                        validatePromptJson_throws(jpr)
-                    except Exception:
-                        jpr = invalid_prompt
+                    jpr = readJsonPrompt(pr, True)
 
                     main_common_prompt_pre = gr.Textbox(
                         value=jpr["prePrompt"], label="Common Prompt Prefix"
@@ -260,8 +253,9 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 ) = create_output_panel(
                     "infinite-zoom", shared.opts.outdir_img2img_samples
                 )
+                
         generate_btn.click(
-            fn=wrap_gradio_gpu_call(check_create_zoom, extra_outputs=[None, "", ""]),
+            fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
             inputs=[
                 main_common_prompt_pre,
                 main_prompts,
@@ -293,70 +287,17 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
-        interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
+        
+        main_prompts.change(fn=checkPrompts,inputs=[main_prompts], outputs=[generate_btn])
+        
+        interrupt.click(fn=shared.state.interrupt(), inputs=[], outputs=[])
     infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
-
-
-def check_create_zoom(
-                main_common_prompt_pre,
-                main_prompts,
-                main_common_prompt_suf,
-                main_negative_prompt,
-                main_outpaint_steps,
-                main_guidance_scale,
-                sampling_step,
-                init_image,
-                exit_image,
-                video_frame_rate,
-                video_zoom_mode,
-                video_start_frame_dupe_amount,
-                video_last_frame_dupe_amount,
-                inpainting_denoising_strength,
-                inpainting_mask_blur,
-                inpainting_fill_mode,
-                inpainting_full_res,
-                inpainting_padding,
-                video_zoom_speed,
-                seed,
-                main_width,
-                main_height,
-                batchcount_slider,
-                main_sampler,
-                upscale_do,
-                upscaler_name,
-                upscale_by, 
-):
-    keys = main_prompts.keys()
-    if 0 not in keys:
-        raise gr.Error("Ensure your prompt table has a step 9 (zero) prompt")
-    
-    return create_zoom(                main_common_prompt_pre,
-                main_prompts,
-                main_common_prompt_suf,
-                main_negative_prompt,
-                main_outpaint_steps,
-                main_guidance_scale,
-                sampling_step,
-                init_image,
-                exit_image,
-                video_frame_rate,
-                video_zoom_mode,
-                video_start_frame_dupe_amount,
-                video_last_frame_dupe_amount,
-                inpainting_denoising_strength,
-                inpainting_mask_blur,
-                inpainting_fill_mode,
-                inpainting_full_res,
-                inpainting_padding,
-                video_zoom_speed,
-                seed,
-                main_width,
-                main_height,
-                batchcount_slider,
-                main_sampler,
-                upscale_do,
-                upscaler_name,
-                upscale_by,
+def checkPrompts(p):
+    return gr.Button.update(
+        interactive=
+        any(0 in sublist for sublist in p) 
+        or 
+        any('0' in sublist for sublist in p) 
     )
