@@ -9,18 +9,19 @@ from .static_variables import (
 
 def completeOptionals(j):
     if isinstance(j, dict):
+        # Remove header information, user dont pimp our ui
         if "prompts" in j:
-            if "headers" not in j["prompts"]:
-                j["prompts"]["headers"] = ["outpaint steps","prompt"]
+            if "headers" in j["prompts"]:
+                del j["prompts"]["headers"]
         
         if "negPrompt" not in j:
-            j["prompts"]["negPrompt"]=""
+            j["negPrompt"]=""
             
         if "prePrompt" not in j:
-            j["prompts"]["prePrompt"]=""
+            j["prePrompt"]=""
             
         if "postPrompt" not in j:
-            j["prompts"]["postPrompt"]=""
+            j["postPrompt"]=""
 
     return j
 
@@ -32,8 +33,7 @@ def validatePromptJson_throws(data):
         validate(instance=data, schema=schema)
        
     except Exception:
-        raise "Your prompts are not schema valid."
-        #fixJson(data)
+        raise Exception("Your prompts are not schema valid.")
 
     return completeOptionals(data)
 
