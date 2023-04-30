@@ -162,7 +162,7 @@ def outpaint_steps(
             main_frames[i] = corrected_frame
         # else :TEST
         # current_image.paste(prev_image, mask=prev_image)
-    return main_frames
+    return main_frames, processed
 
 
 def create_zoom(
@@ -387,7 +387,7 @@ def create_zoom_single(
     load_model_from_setting(
         "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
     )
-    main_frames = outpaint_steps(
+    main_frames, processed = outpaint_steps(
         width,
         height,
         common_prompt_pre,
