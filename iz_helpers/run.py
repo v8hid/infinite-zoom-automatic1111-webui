@@ -56,6 +56,9 @@ def outpaint_steps(
         print(print_out)
 
         current_image = main_frames[-1]
+        current_image = shrink_and_paste_on_blank(
+            current_image, mask_width, mask_height
+        )
 
         # apply available alpha mask of previous image
         if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
@@ -84,7 +87,7 @@ def outpaint_steps(
             current_image = resize_and_crop_image(custom_exit_image, width, height)
             main_frames.append(current_image.convert("RGB"))
             print("using Custom Exit Image")
-            save2Collect(current_image, out_config, f"exit_img.png")            
+            save2Collect(current_image, out_config, f"exit_img.png")
         else:
             if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))] == "":
                 pr = prompts[max(k for k in prompts.keys() if k <= i)]
@@ -119,6 +122,8 @@ def outpaint_steps(
 
         #seed = newseed
         # TODO: seed behavior
+
+            # TODO: seed behavior
 
         if frame_correction and inpainting_mask_blur > 0:
             corrected_frame = crop_inner_image(
@@ -431,7 +436,6 @@ def create_zoom_single(
         mask_height,
         custom_exit_image,
     )
-
     all_frames.append(
         do_upscaleImg(main_frames[0], upscale_do, upscaler_name, upscale_by)
         if upscale_do
@@ -474,7 +478,6 @@ def create_zoom_single(
                     height - interpol_height,
                 )
             )
-            # save2Collect(interpol_image, out_config, f"interpol_crop_{i}_{j}.png")
 
             interpol_image = interpol_image.resize((width, height))
             save2Collect(interpol_image, out_config, f"interpol_resize_{i}_{j}.png")
@@ -497,7 +500,7 @@ def create_zoom_single(
             )
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
-            # save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
+            save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
 
             if upscale_do and progress:
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
@@ -517,7 +520,7 @@ def create_zoom_single(
             else current_image
         )
 
-    # frames2Collect(all_frames, out_config)
+    frames2Collect(all_frames, out_config)
 
     write_video(
         out_config["video_filename"],
