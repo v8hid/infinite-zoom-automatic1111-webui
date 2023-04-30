@@ -1,6 +1,6 @@
 import math, time, os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter, ImageDraw
 from modules.ui import plaintext_to_html
 import modules.shared as shared
 from modules.processing import Processed, StableDiffusionProcessing
