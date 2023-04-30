@@ -14,7 +14,7 @@ def completeOptionals(j):
                 j["prompts"]["headers"] = ["outpaint steps","prompt"]
         
         if "negPrompt" not in j:
-            j["prompts"]["negPrompt"]=""
+            j["negPrompt"]=""
             
         if "prePrompt" not in j:
             j["prePrompt"]=""
