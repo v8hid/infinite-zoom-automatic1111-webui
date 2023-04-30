@@ -89,9 +89,10 @@ def outpaint_steps(
     mask_width,
     mask_height,
     custom_exit_image,
-    frame_correction=True,
+    frame_correction=True,  # TODO: add frame_Correction in UI
 ):
     main_frames = [init_img.convert("RGB")]
+
     for i in range(outpaint_steps):
         print_out = (
             "Outpaint step: "
@@ -103,18 +104,13 @@ def outpaint_steps(
         )
         print(print_out)
         current_image = main_frames[-1]
-        prev_image_fix = current_image
-        # save2Collect(prev_image_fix, out_config, f"prev_image_fix_{i}.png")
+        current_image = shrink_and_paste_on_blank(
+            current_image, mask_width, mask_height
+        )
 
-        prev_image = shrink_and_paste_on_blank(current_image, mask_width, mask_height)
-        # save2Collect(prev_image, out_config, f"prev_image_{i}.png")
-
-        current_image = prev_image
-
-        # create mask (black image with white mask_width width edges)
         mask_image = np.array(current_image)[:, :, 3]
         mask_image = Image.fromarray(255 - mask_image).convert("RGB")
-        # save2Collect(mask_image, out_config, f"mask_image_{i}.png")
+        # create mask (black image with white mask_width width edges)
 
         if custom_exit_image and ((i + 1) == outpaint_steps):
             current_image = custom_exit_image.resize(
@@ -122,7 +118,7 @@ def outpaint_steps(
             )
             main_frames.append(current_image.convert("RGB"))
             # print("using Custom Exit Image")
-            # save2Collect(current_image, out_config, f"exit_img.png")
+            save2Collect(current_image, out_config, f"exit_img.png")
         else:
             pr = prompts[max(k for k in prompts.keys() if k <= i)]
             processed, newseed = renderImg2Img(
@@ -142,9 +138,13 @@ def outpaint_steps(
                 inpainting_full_res,
                 inpainting_padding,
             )
+
             if len(processed.images) > 0:
                 main_frames.append(processed.images[0].convert("RGB"))
+                save2Collect(processed.images[0], out_config, f"outpain_step_{i}.png")
             seed = newseed
+            # TODO: seed behavior
+
         if frame_correction and inpainting_mask_blur > 0:
             corrected_frame = crop_inner_image(
                 main_frames[i + 1], mask_width, mask_height
@@ -156,13 +156,12 @@ def outpaint_steps(
                 inpainting_mask_blur / 3 // 2,
                 inpainting_mask_blur / 3 // 2,
             )
-
-            # save2Collect(enhanced_img, out_config, f"enhanced_frame_{i}")
+            save2Collect(main_frames[i], out_config, f"main_frame_{i}")
+            save2Collect(enhanced_img, out_config, f"main_frame_enhanced_{i}")
             corrected_frame.paste(enhanced_img, mask=enhanced_img)
             main_frames[i] = corrected_frame
         # else :TEST
         # current_image.paste(prev_image, mask=prev_image)
-    # frames2Collect(main_frames, out_config)
     return main_frames
 
 
@@ -352,8 +351,7 @@ def create_zoom_single(
         current_image = custom_init_image.resize(
             (width, height), resample=Image.LANCZOS
         )
-        # save2Collect(current_image, out_config, f"init_img.png")
-        print("using Custom Initial Image")
+        save2Collect(current_image, out_config, f"init_custom.png")
 
     else:
         load_model_from_setting(
@@ -373,7 +371,7 @@ def create_zoom_single(
         )
         if len(processed.images) > 0:
             current_image = processed.images[0]
-            # save2Collect(current_image, out_config, f"txt2img.png")
+            save2Collect(current_image, out_config, f"init_txt2img.png")
         current_seed = newseed
 
     mask_width = math.trunc(width / 4)  # was initially 512px => 128px
@@ -412,27 +410,17 @@ def create_zoom_single(
         mask_height,
         custom_exit_image,
     )
-    all_frames.append(main_frames[0])
     all_frames.append(
         do_upscaleImg(main_frames[0], upscale_do, upscaler_name, upscale_by)
         if upscale_do
         else main_frames[0]
     )
     for i in range(len(main_frames) - 1):
-        # TODO: fix upscale
-        # all_frames.append(
-        #     do_upscaleImg(
-        #         prev_image_fix.convert("RGB"), upscale_do, upscaler_name, upscale_by
-        #     )
-        #     if upscale_do
-        #     else prev_image_fix.convert("RGB")
-        # )
-
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             current_image = main_frames[i + 1]
             interpol_image = current_image
-            # save2Collect(interpol_image, out_config, f"interpol_img_{i}_{j}].png")
+            save2Collect(interpol_image, out_config, f"interpol_img_{i}_{j}].png")
 
             interpol_width = math.ceil(
                 (
@@ -462,10 +450,9 @@ def create_zoom_single(
                     height - interpol_height,
                 )
             )
-            # save2Collect(interpol_image, out_config, f"interpol_crop_{i}_{j}.png")
 
             interpol_image = interpol_image.resize((width, height))
-            # save2Collect(interpol_image, out_config, f"interpol_resize_{i}_{j}.png")
+            save2Collect(interpol_image, out_config, f"interpol_resize_{i}_{j}.png")
 
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
             interpol_width2 = math.ceil(
@@ -483,10 +470,9 @@ def create_zoom_single(
             prev_image_fix_crop = shrink_and_paste_on_blank(
                 main_frames[i], interpol_width2, interpol_height2
             )
-            # save2Collect(prev_image_fix, out_config, f"prev_image_fix_crop_{i}_{j}.png")
 
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
-            # save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
+            save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
 
             if upscale_do and progress:
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
@@ -506,7 +492,7 @@ def create_zoom_single(
             else current_image
         )
 
-    # frames2Collect(all_frames, out_config)
+    frames2Collect(all_frames, out_config)
 
     write_video(
         out_config["video_filename"],
@@ -519,7 +505,7 @@ def create_zoom_single(
 
     return (
         out_config["video_filename"],
-        processed.images,
+        main_frames,
         processed.js(),
         plaintext_to_html(processed.info),
         plaintext_to_html(""),
