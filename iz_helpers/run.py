@@ -1,6 +1,6 @@
 import math, time, os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter, ImageDraw
 from modules.ui import plaintext_to_html
 import modules.shared as shared
 
@@ -13,6 +13,58 @@ from .helpers import (
 from .sd_helpers import renderImg2Img, renderTxt2Img
 from .image import shrink_and_paste_on_blank
 from .video import write_video
+
+
+def crop_fethear_ellipse(image, feather_margin=30, width_offset=0, height_offset=0):
+    # Create a blank mask image with the same size as the original image
+    mask = Image.new("L", image.size, 0)
+    draw = ImageDraw.Draw(mask)
+
+    # Calculate the ellipse's bounding box
+    ellipse_box = (
+        width_offset,
+        height_offset,
+        image.width - width_offset,
+        image.height - height_offset,
+    )
+
+    # Draw the ellipse on the mask
+    draw.ellipse(ellipse_box, fill=255)
+
+    # Apply the mask to the original image
+    result = Image.new("RGBA", image.size)
+    result.paste(image, mask=mask)
+
+    # Crop the resulting image to the ellipse's bounding box
+    cropped_image = result.crop(ellipse_box)
+
+    # Create a new mask image with a black background (0)
+    mask = Image.new("L", cropped_image.size, 0)
+    draw = ImageDraw.Draw(mask)
+
+    # Draw an ellipse on the mask image
+    draw.ellipse(
+        (
+            0 + feather_margin,
+            0 + feather_margin,
+            cropped_image.width - feather_margin,
+            cropped_image.height - feather_margin,
+        ),
+        fill=255,
+        outline=0,
+    )
+
+    # Apply a Gaussian blur to the mask image
+    mask = mask.filter(ImageFilter.GaussianBlur(radius=feather_margin / 2))
+    cropped_image.putalpha(mask)
+    res = Image.new(cropped_image.mode, (image.width, image.height))
+    paste_pos = (
+        int((res.width - cropped_image.width) / 2),
+        int((res.height - cropped_image.height) / 2),
+    )
+    res.paste(cropped_image, paste_pos)
+
+    return res
 
 
 def outpaint_steps(
@@ -69,7 +121,7 @@ def outpaint_steps(
                 (width, height), resample=Image.LANCZOS
             )
             main_frames.append(current_image.convert("RGB"))
-            print("using Custom Exit Image")
+            # print("using Custom Exit Image")
             # save2Collect(current_image, out_config, f"exit_img.png")
         else:
             pr = prompts[max(k for k in prompts.keys() if k <= i)]
@@ -97,14 +149,20 @@ def outpaint_steps(
             corrected_frame = crop_inner_image(
                 main_frames[i + 1], mask_width, mask_height
             )
-            save2Collect(current_image, out_config, f"corrected_{i}")
-            main_frames[i] = corrected_frame
 
-        # else TEST pasting differance
+            enhanced_img = crop_fethear_ellipse(
+                main_frames[i],
+                30,
+                inpainting_mask_blur / 3 // 2,
+                inpainting_mask_blur / 3 // 2,
+            )
+
+            # save2Collect(enhanced_img, out_config, f"enhanced_frame_{i}")
+            corrected_frame.paste(enhanced_img, mask=enhanced_img)
+            main_frames[i] = corrected_frame
+        # else :TEST
         # current_image.paste(prev_image, mask=prev_image)
-    frames2Collect(main_frames, out_config)
-    print(out_config)
-    print("length: ", len(main_frames))
+    # frames2Collect(main_frames, out_config)
     return main_frames
 
 
@@ -354,6 +412,12 @@ def create_zoom_single(
         mask_height,
         custom_exit_image,
     )
+    all_frames.append(main_frames[0])
+    all_frames.append(
+        do_upscaleImg(main_frames[0], upscale_do, upscaler_name, upscale_by)
+        if upscale_do
+        else main_frames[0]
+    )
     for i in range(len(main_frames) - 1):
         # TODO: fix upscale
         # all_frames.append(
@@ -363,13 +427,14 @@ def create_zoom_single(
         #     if upscale_do
         #     else prev_image_fix.convert("RGB")
         # )
+
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
             current_image = main_frames[i + 1]
             interpol_image = current_image
             # save2Collect(interpol_image, out_config, f"interpol_img_{i}_{j}].png")
 
-            interpol_width = round(
+            interpol_width = math.ceil(
                 (
                     1
                     - (1 - 2 * mask_width / width)
@@ -379,7 +444,7 @@ def create_zoom_single(
                 / 2
             )
 
-            interpol_height = round(
+            interpol_height = math.ceil(
                 (
                     1
                     - (1 - 2 * mask_height / height)
@@ -403,13 +468,13 @@ def create_zoom_single(
             # save2Collect(interpol_image, out_config, f"interpol_resize_{i}_{j}.png")
 
             # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
-            interpol_width2 = round(
+            interpol_width2 = math.ceil(
                 (1 - (width - 2 * mask_width) / (width - 2 * interpol_width))
                 / 2
                 * width
             )
 
-            interpol_height2 = round(
+            interpol_height2 = math.ceil(
                 (1 - (height - 2 * mask_height) / (height - 2 * interpol_height))
                 / 2
                 * height
