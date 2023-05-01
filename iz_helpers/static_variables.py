@@ -8,7 +8,10 @@ default_prompt = """
     "prompts":{
         "headers":["outpaint steps","prompt","image location","blend mask location", "is keyframe"],
         "data":[
-            [0,"Huge spectacular Waterfall in a dense tropical forest,epic perspective,(vegetation overgrowth:1.3)(intricate, ornamentation:1.1),(baroque:1.1), fantasy, (realistic:1) digital painting , (magical,mystical:1.2) , (wide angle shot:1.4), (landscape composed:1.2)(medieval:1.1), divine,cinematic,(tropical forest:1.4),(river:1.3)mythology,india, volumetric lighting, Hindu ,epic,  Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2) <lora:epiNoiseoffset_v2:0.6> ","C:\\path\\to\\image.png", "C:\\path\\to\\mask_image.png", false]
+            [0,"Huge spectacular Waterfall in a dense tropical forest,epic perspective,(vegetation overgrowth:1.3)(intricate, ornamentation:1.1),(baroque:1.1), fantasy, (realistic:1) digital painting , (magical,mystical:1.2) , (wide angle shot:1.4), (landscape composed:1.2)(medieval:1.1), divine,cinematic,(tropical forest:1.4),(river:1.3)mythology,india, volumetric lighting, Hindu ,epic,  Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2) <lora:epiNoiseoffset_v2:0.6> ","C:\\path\\to\\image.png", "C:\\path\\to\\mask_image.png", false],
+            [2, "a Lush jungle","","",false],
+			[3, "a Thick rainforest","","",false],
+			[5, "a Verdant canopy","","",false]
         ]
     },
     "commonPromptSuffix":"style by Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2)",
@@ -27,7 +30,7 @@ invalid_prompt = {
     },
     "negPrompt": "Invalid prompt-json",
     "commonPromptPrefix": "Invalid prompt",
-    "commonPromptSuffix": "Invalid prompt"
+    "commonPromptSuffix": "Invalid prompt",
 }
 
 available_samplers = [
