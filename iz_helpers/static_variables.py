@@ -27,8 +27,8 @@ invalid_prompt = {
         "headers": ["outpaint steps", "prompt"],
     },
     "negPrompt": "Invalid prompt-json",
-    "commonPromptPrefix": "Invalid prompt",
-    "commonPromptSuffix": "Invalid prompt",
+    "prePromp": "Invalid prompt",
+    "postPrompt": "Invalid prompt"
 }
 
 available_samplers = [

@@ -67,7 +67,7 @@ def on_ui_settings():
             None,
             "Name of your desired model to render keyframes (txt2img)",
             gr.Dropdown,
-            lambda: {"choices": shared.list_checkpoint_tiles()},
+            lambda: {"choices": [x for x in list(shared.list_checkpoint_tiles()) if "inpainting" not in x]},
             section=section,
         ),
     )
@@ -78,7 +78,7 @@ def on_ui_settings():
             None,
             "Name of your desired inpaint model (img2img-inpaint). Default is vanilla sd-v1-5-inpainting.ckpt ",
             gr.Dropdown,
-            lambda: {"choices": shared.list_checkpoint_tiles()},
+            lambda: {"choices": [x for x in list(shared.list_checkpoint_tiles()) if "inpainting" in x]},
             section=section,
         ),
     )
