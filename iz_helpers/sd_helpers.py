@@ -2,6 +2,7 @@ from modules.processing import (
     process_images,
     StableDiffusionProcessingTxt2Img,
     StableDiffusionProcessingImg2Img,
+    Processed
 )
 import modules.shared as shared
 
@@ -72,5 +73,10 @@ def renderImg2Img(
     # p.latent_mask = Image.new("RGB", (p.width, p.height), "white")
 
     processed = process_images(p)
+    # For those that use Image grids this will make sure that ffmpeg does not crash out
+    if (len(processed.images) > 1) and (processed.images[0].size[0] != processed.images[-1].size[0]):
+        processed.images.pop(0)
+        print("\nGrid image detected applying patch")
+
     newseed = p.seed
     return processed, newseed

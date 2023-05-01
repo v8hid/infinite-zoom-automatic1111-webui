@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageEnhance
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageDraw, ImageFont
 import requests
 import base64
 import numpy as np
@@ -30,6 +30,15 @@ def shrink_and_paste_on_blank(current_image, mask_width, mask_height):
 
 
 def open_image(image_path):
+    """
+    Opens an image from a file path or URL, or decodes a DataURL string into an image.
+
+    Parameters:
+        image_path (str): The file path, URL, or DataURL string of the image to open.
+
+    Returns:
+        Image: A PIL Image object of the opened image.
+    """
     if image_path.startswith('http'):
         # If the image path is a URL, download the image using requests
         response = requests.get(image_path)
@@ -46,6 +55,16 @@ def open_image(image_path):
     return img
 
 def apply_alpha_mask(image, mask_image):
+    """
+    Applies a mask image as the alpha channel of the input image.
+
+    Parameters:
+        image (Image): A PIL Image object of the image to apply the mask to.
+        mask_image (Image): A PIL Image object of the alpha mask to apply.
+
+    Returns:
+        Image: A PIL Image object of the input image with the applied alpha mask.
+    """
     # Resize the mask to match the current image size
     mask_image = mask_image.resize(image.size)
     # Apply the mask as the alpha layer of the current image
@@ -53,7 +72,25 @@ def apply_alpha_mask(image, mask_image):
     result_image.putalpha(mask_image.convert('L')) # convert to grayscale
     return result_image
 
-def resize_image_with_aspect_ratio(image, basewidth=512, baseheight=512):
+def resize_image_with_aspect_ratio(image: Image, basewidth: int = 512, baseheight: int = 512) -> Image:
+    """
+    Resizes an image while maintaining its aspect ratio. This may not fill the entire image height.
+
+    Args:
+    - image (PIL.Image): The input image.
+    - basewidth (int): The desired width of the output image. Defaults to 512.
+    - baseheight (int): The desired height of the output image. Defaults to 512.
+
+    Returns:
+    - PIL.Image: The resized image.
+
+    Raises:
+    - ValueError: If `basewidth` or `baseheight` is less than or equal to 0.
+
+    """
+    if basewidth <= 0 or baseheight <= 0:
+        raise ValueError("resize_image_with_aspect_ratio error: basewidth and baseheight must be greater than 0")
+
     # Get the original size of the image
     orig_width, orig_height = image.size
     
@@ -81,29 +118,46 @@ def resize_image_with_aspect_ratio(image, basewidth=512, baseheight=512):
     
     return resized_image
 
-def resize_and_crop_image(image, new_width=512, new_height=512):
+def resize_and_crop_image(image: Image, new_width: int = 512, new_height: int = 512) -> Image:
+    """
+    Resizes and crops an image to a specified width and height. This ensures that the entire new_width and new_height 
+    dimensions are filled by the image, and the aspect ratio is maintained.
+
+    Parameters:
+    - image (PIL.Image): The image to be resized and cropped.
+    - new_width (int): The desired width of the new image. Default is 512.
+    - new_height (int): The desired height of the new image. Default is 512.
+
+    Returns:
+    - cropped_image (PIL.Image): The resized and cropped image.
+    """
     # Get the dimensions of the original image
-    orig_width, orig_height = image.size    
+    orig_width, orig_height = image.size
+
     # Calculate the aspect ratios of the original and new images
     orig_aspect_ratio = orig_width / float(orig_height)
-    new_aspect_ratio = new_width / float(new_height)    
+    new_aspect_ratio = new_width / float(new_height)
+
     # Calculate the new size of the image while maintaining aspect ratio
     if orig_aspect_ratio > new_aspect_ratio:
         # The original image is wider than the new image, so we need to crop the sides
         resized_width = int(new_height * orig_aspect_ratio)
         resized_height = new_height
-        left_offset = (resized_width - new_width) / 2
+        left_offset = (resized_width - new_width) // 2
         top_offset = 0
     else:
         # The original image is taller than the new image, so we need to crop the top and bottom
         resized_width = new_width
         resized_height = int(new_width / orig_aspect_ratio)
         left_offset = 0
-        top_offset = (resized_height - new_height) / 2    
+        top_offset = (resized_height - new_height) // 2
+
     # Resize the image with Lanczos resampling filter
-    resized_image = image.resize((resized_width, resized_height), resample=Image.LANCZOS)    
+    resized_image = image.resize((resized_width, resized_height), resample=Image.LANCZOS)
+
     # Crop the image to fill the entire height and width of the new image
-    cropped_image = resized_image.crop((left_offset, top_offset, left_offset + new_width, top_offset + new_height))    
+    cropped_image = resized_image.crop((left_offset, top_offset, left_offset + new_width, top_offset + new_height))
+
     return cropped_image
 
 def grayscale_to_gradient(image, gradient_colors):
@@ -287,3 +341,102 @@ def draw_gradient_ellipse(width=512, height=512, white_amount=1.0, rotation = 0.
     # Creating object of Brightness class
     # Return the result image
     return image
+
+def crop_fethear_ellipse(image: Image.Image, feather_margin: int = 30, width_offset: int = 0, height_offset: int = 0) -> Image.Image:
+    """
+    Crop an elliptical region from the input image with a feathered edge.
+
+    Args:
+        image (PIL.Image.Image): The input image.
+        feather_margin (int): The size of the feathered edge, in pixels. Default is 30.
+        width_offset (int): The offset from the left and right edges of the image to the elliptical region. Default is 0.
+        height_offset (int): The offset from the top and bottom edges of the image to the elliptical region. Default is 0.
+
+    Returns:
+        A new PIL Image containing the cropped elliptical region with a feathered edge.
+    """
+
+    # Create a blank mask image with the same size as the original image
+    mask = Image.new("L", image.size, 0)
+    draw = ImageDraw.Draw(mask)
+
+    # Calculate the ellipse's bounding box
+    ellipse_box = (
+        width_offset,
+        height_offset,
+        image.width - width_offset,
+        image.height - height_offset,
+    )
+
+    # Draw the ellipse on the mask
+    draw.ellipse(ellipse_box, fill=255)
+
+    # Apply the mask to the original image
+    result = Image.new("RGBA", image.size)
+    result.paste(image, mask=mask)
+
+    # Crop the resulting image to the ellipse's bounding box
+    cropped_image = result.crop(ellipse_box)
+
+    # Create a new mask image with a black background (0)
+    mask = Image.new("L", cropped_image.size, 0)
+    draw = ImageDraw.Draw(mask)
+
+    # Draw an ellipse on the mask image with a feathered edge
+    draw.ellipse(
+        (
+            0 + feather_margin,
+            0 + feather_margin,
+            cropped_image.width - feather_margin,
+            cropped_image.height - feather_margin,
+        ),
+        fill=255,
+        outline=0,
+    )
+
+    # Apply a Gaussian blur to the mask image
+    mask = mask.filter(ImageFilter.GaussianBlur(radius=feather_margin / 2))
+    cropped_image.putalpha(mask)
+
+    # Paste the cropped image onto a new image with the same size as the input image
+    res = Image.new(cropped_image.mode, (image.width, image.height))
+    paste_pos = (
+        int((res.width - cropped_image.width) / 2),
+        int((res.height - cropped_image.height) / 2),
+    )
+    res.paste(cropped_image, paste_pos)
+
+    return res
+
+def crop_inner_image(image: Image, width_offset: int, height_offset: int) -> Image:
+    """
+    Crops an input image to the center, with the specified width and height offsets.
+
+    Args:
+        image (PIL.Image): The input image to be cropped.
+        width_offset (int): The width offset used for cropping.
+        height_offset (int): The height offset used for cropping.
+
+    Returns:
+        PIL.Image: The cropped image, resized to the original image size using Lanczos resampling.
+    """
+    # Get the size of the input image
+    width, height = image.size
+
+    # Calculate the center coordinates of the image
+    center_x, center_y = int(width / 2), int(height / 2)
+
+    # Crop the image to the center using the specified offsets
+    cropped_image = image.crop(
+        (
+            center_x - width_offset,
+            center_y - height_offset,
+            center_x + width_offset,
+            center_y + height_offset,
+        )
+    )
+
+    # Resize the cropped image to the original image size using Lanczos resampling
+    resized_image = cropped_image.resize((width, height), resample=Image.LANCZOS)
+
+    return resized_image

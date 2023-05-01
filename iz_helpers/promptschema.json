@@ -1,58 +1,77 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-      "prompts": {
-        "type": "object",
-        "properties": {
-          "data": {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "1.2",
+  "type": "object",
+  "properties": {
+    "prompts": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
             "type": "array",
-            "items": {
-              "type": "array",
-              "items": [
-                {
-                  "oneOf": [
-                    {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    {
-                      "type": "string"
-                    }
-                  ]
-                },
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "boolean"
-                }
-              ],
-              "minItems": 0,
-              "maxItems": 999,
-              "uniqueItems": false
-            },
-            "minItems": 0
+            "items": [
+              {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "oneOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            ],
+            "minItems": 0,
+            "maxItems": 999,
+            "uniqueItems": false
           },
-          "headers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 5
-          }
+          "minItems": 0
         },
-        "required": ["data", "headers"]
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2
+        }
       },
-      "negPrompt": {
-        "type": "string"
-      }
+      "required": [ "data", "headers" ]
     },
-    "required": ["prompts", "negPrompt"]
-  }
+    "negPrompt": {
+      "type": "string"
+    },
+    "commonPromptPrefix": {
+      "type": "string"
+    },
+    "commonPromptSuffix": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "prompts",
+    "negPrompt",
+    "commonPromptPrefix",
+    "commonPromptSuffix"
+  ]
+}

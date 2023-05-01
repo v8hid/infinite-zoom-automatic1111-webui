@@ -30,14 +30,23 @@ def on_ui_tabs():
         with gr.Row():
             with gr.Column(scale=1, variant="panel"):
                 with gr.Tab("Main"):
-                    main_outpaint_steps = gr.Slider(
-                        minimum=2,
-                        maximum=100,
-                        step=1,
-                        value=8,
-                        label="Total Outpaint Steps",
-                        info="The more it is, the longer your videos will be",
-                    )
+                    with gr.Row():
+                        batchcount_slider = gr.Slider(
+                            minimum=1,
+                            maximum=25,
+                            value=shared.opts.data.get("infzoom_batchcount", 1),
+                            step=1,
+                            label="Batch Count",
+                        )
+
+                        main_outpaint_steps = gr.Slider(
+                            minimum=2,
+                            maximum=100,
+                            step=1,
+                            value=8,
+                            label="Total Outpaint Steps",
+                            info="The more it is, the longer your videos will be",
+                        )
 
                     # safe reading json prompt
                     pr = shared.opts.data.get("infzoom_defPrompt", default_prompt)
@@ -49,6 +58,9 @@ def on_ui_tabs():
                     except Exception:
                         jpr = invalid_prompt
 
+                    main_common_prompt_pre = gr.Textbox(
+                        value=jpr["commonPromptPrefix"], label="Common Prompt Prefix"
+                    )
                     main_prompts = gr.Dataframe(
                         type="array",
                         headers=["outpaint step", "prompt", "image location", "blend mask", "is keyframe"],
@@ -57,6 +69,10 @@ def on_ui_tabs():
                         col_count=(5, "fixed"),
                         value=jpr["prompts"],
                         wrap=True,
+                    )
+
+                    main_common_prompt_suf = gr.Textbox(
+                        value=jpr["commonPromptSuffix"], label="Common Prompt Suffix"
                     )
 
                     main_negative_prompt = gr.Textbox(
@@ -79,12 +95,22 @@ def on_ui_tabs():
                     exportPrompts_button.click(
                         None,
                         _js="exportPrompts",
-                        inputs=[main_prompts, main_negative_prompt],
+                        inputs=[
+                            main_common_prompt_pre,
+                            main_prompts,
+                            main_common_prompt_suf,
+                            main_negative_prompt,
+                        ],
                         outputs=None,
                     )
                     importPrompts_button.upload(
                         fn=putPrompts,
-                        outputs=[main_prompts, main_negative_prompt],
+                        outputs=[
+                            main_common_prompt_pre,
+                            main_prompts,
+                            main_common_prompt_suf,
+                            main_negative_prompt,
+                        ],
                         inputs=[importPrompts_button],
                     )
 
@@ -97,59 +123,59 @@ def on_ui_tabs():
                     clearPrompts_button.click(
                         fn=clearPrompts,
                         inputs=[],
-                        outputs=[main_prompts, main_negative_prompt],
+                        outputs=[
+                            main_prompts,
+                            main_negative_prompt,
+                            main_common_prompt_pre,
+                            main_common_prompt_suf,
+                        ],
                     )
-                    with gr.Row():
-                        seed = gr.Number(
-                            label="Seed", value=-1, precision=0, interactive=True
-                        )
-                        main_sampler = gr.Dropdown(
-                            label="Sampler",
-                            choices=available_samplers,
-                            value="Euler a",
-                            type="value",
-                        )
-                    with gr.Row():
-                        main_width = gr.Slider(
-                            minimum=16,
-                            maximum=2048,
-                            value=shared.opts.data.get("infzoom_outsizeW", 512),
-                            step=16,
-                            label="Output Width",
-                        )
-                        main_height = gr.Slider(
-                            minimum=16,
-                            maximum=2048,
-                            value=shared.opts.data.get("infzoom_outsizeH", 512),
-                            step=16,
-                            label="Output Height",
-                        )
-                    with gr.Row():
-                        main_guidance_scale = gr.Slider(
-                            minimum=0.1,
-                            maximum=15,
-                            step=0.1,
-                            value=7,
-                            label="Guidance Scale",
-                        )
-                        sampling_step = gr.Slider(
-                            minimum=1,
-                            maximum=100,
-                            step=1,
-                            value=50,
-                            label="Sampling Steps for each outpaint",
-                        )
-                    with gr.Row():
-                        init_image = gr.Image(type="pil", label="custom initial image")
-                        exit_image = gr.Image(type="pil", label="custom exit image")
 
-                    batchcount_slider = gr.Slider(
-                        minimum=1,
-                        maximum=25,
-                        value=shared.opts.data.get("infzoom_batchcount", 1),
-                        step=1,
-                        label="Batch Count",
-                    )
+                    with gr.Accordion("Render settings"):
+                        with gr.Row():
+                            seed = gr.Number(
+                                label="Seed", value=-1, precision=0, interactive=True
+                            )
+                            main_sampler = gr.Dropdown(
+                                label="Sampler",
+                                choices=available_samplers,
+                                value="Euler a",
+                                type="value",
+                            )
+                        with gr.Row():
+                            main_width = gr.Slider(
+                                minimum=16,
+                                maximum=2048,
+                                value=shared.opts.data.get("infzoom_outsizeW", 512),
+                                step=16,
+                                label="Output Width",
+                            )
+                            main_height = gr.Slider(
+                                minimum=16,
+                                maximum=2048,
+                                value=shared.opts.data.get("infzoom_outsizeH", 512),
+                                step=16,
+                                label="Output Height",
+                            )
+                        with gr.Row():
+                            main_guidance_scale = gr.Slider(
+                                minimum=0.1,
+                                maximum=15,
+                                step=0.1,
+                                value=7,
+                                label="Guidance Scale",
+                            )
+                            sampling_step = gr.Slider(
+                                minimum=1,
+                                maximum=100,
+                                step=1,
+                                value=50,
+                                label="Sampling Steps for each outpaint",
+                            )
+                        with gr.Row():
+                            init_image = gr.Image(type="pil", label="custom initial image")
+                            exit_image = gr.Image(type="pil", label="custom exit image")
+
                 with gr.Tab("Video"):
                     video_frame_rate = gr.Slider(
                         label="Frames per second",
@@ -237,7 +263,9 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
         generate_btn.click(
             fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
             inputs=[
+                main_common_prompt_pre,
                 main_prompts,
+                main_common_prompt_suf,
                 main_negative_prompt,
                 main_outpaint_steps,
                 main_guidance_scale,

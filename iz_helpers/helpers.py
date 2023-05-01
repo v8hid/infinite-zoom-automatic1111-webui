@@ -7,7 +7,7 @@ import modules.sd_models
 import gradio as gr
 from scripts import postprocessing_upscale
 from .static_variables import jsonprompt_schemafile
-
+import asyncio
 
 def fix_env_Path_ffprobe():
     envpath = os.environ["PATH"]
@@ -90,6 +90,9 @@ def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
     )
     return pp.image
 
+async def showGradioErrorAsync(txt, delay=1):
+    await asyncio.sleep(delay)  # sleep for 1 second
+    raise gr.Error(txt)
 
 def validatePromptJson_throws(data):
     with open(jsonprompt_schemafile, "r") as s:
@@ -104,8 +107,10 @@ def putPrompts(files):
             data = json.loads(file_contents)
             validatePromptJson_throws(data)
             return [
+                gr.Textbox.update(data["commonPromptPrefix"]),
                 gr.DataFrame.update(data["prompts"]),
-                gr.Textbox.update(data["negPrompt"]),
+                gr.Textbox.update(data["commonPromptSuffix"]),
+                gr.Textbox.update(data["negPrompt"])
             ]
 
     except Exception:
@@ -115,13 +120,15 @@ def putPrompts(files):
         print(
             "[InfiniteZoom:] Loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
         )
-        return [gr.DataFrame.update(), gr.Textbox.update()]
+        return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update()]
 
 
 def clearPrompts():
     return [
         gr.DataFrame.update(value=[[0, "Infinite Zoom. Start over"]]),
         gr.Textbox.update(""),
+        gr.Textbox.update(""),
+        gr.Textbox.update("")
     ]
 
 def value_to_bool(value):
