@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageDraw
 from modules.ui import plaintext_to_html
 import modules.shared as shared
-
+from modules.paths_internal import script_path
 from .helpers import (
     fix_env_Path_ffprobe,
     closest_upper_divisible_by_eight,
@@ -231,7 +231,7 @@ def create_zoom(
 
 def prepare_output_path():
     isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
-    output_path = shared.opts.data.get("infzoom_outpath", "output")
+    output_path = shared.opts.data.get("infzoom_outpath", "outputs")
 
     save_path = os.path.join(
         output_path, shared.opts.data.get("infzoom_outSUBpath", "infinite-zooms")
@@ -502,7 +502,7 @@ def create_zoom_single(
         int(video_start_frame_dupe_amount),
         int(video_last_frame_dupe_amount),
     )
-
+    print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
     return (
         out_config["video_filename"],
         main_frames,
