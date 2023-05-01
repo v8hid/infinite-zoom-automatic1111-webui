@@ -2,6 +2,8 @@ import os
 from modules import scripts
 import modules.sd_samplers
 
+promptTableHeaders=["Start at second [0,1,...]", "prompt", "image location", "blend mask", "is keyframe"],
+
 default_prompt = """
 {
     "prePrompt":"<lora:epiNoiseoffset_v2:0.6> ",

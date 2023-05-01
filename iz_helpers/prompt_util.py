@@ -4,7 +4,8 @@ from jsonschema import validate
 from .static_variables import (
     empty_prompt,
     invalid_prompt,
-    jsonprompt_schemafile
+    jsonprompt_schemafile,
+    promptTableHeaders
 )
 
 def completeOptionals(j):
@@ -13,15 +14,22 @@ def completeOptionals(j):
         if "prompts" in j:
             if "headers" in j["prompts"]:
                 del j["prompts"]["headers"]
-        
+            j["prompts"]["headers"]=promptTableHeaders
+            
         if "negPrompt" not in j:
             j["negPrompt"]=""
             
         if "prePrompt" not in j:
-            j["prePrompt"]=""
+            if "commonPromptPrefix" in j:
+                j["prePrompt"]=j["commonPromptPrefix"]
+            else:
+                j["prePrompt"]=""
             
         if "postPrompt" not in j:
-            j["postPrompt"]=""
+            if "commonPromptSuffix" in j:
+                j["postPrompt"]=j["commonPromptSuffix"]
+            else:
+                j["postPrompt"]=""
 
     return j
 

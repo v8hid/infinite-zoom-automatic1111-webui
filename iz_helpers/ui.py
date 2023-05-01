@@ -11,6 +11,8 @@ from .static_variables import (
     available_samplers,
 )
 from .helpers import validatePromptJson_throws, putPrompts, clearPrompts
+from .prompt_util import readJsonPrompt
+from .static_variables import promptTableHeaders
 
 
 def on_ui_tabs():
@@ -58,6 +60,8 @@ def on_ui_tabs():
                         type="array",
                         headers=["outpaint step", "prompt", "image location", "blend mask", "is keyframe"],
                         datatype=["number", "str", "str", "str", "bool"],                        
+                        headers= promptTableHeaders,
+                        datatype=["number", "str", "str", "str", "bool"],
                         row_count=1,
                         col_count=(5, "fixed"),
                         value=jpr["prompts"],
