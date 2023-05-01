@@ -38,7 +38,7 @@ def on_ui_tabs():
                         )
 
                         main_outpaint_steps = gr.Slider(
-                            minimum=2,
+                            minimum=1,
                             maximum=100,
                             step=1,
                             value=8,
