@@ -9,6 +9,7 @@ from .static_variables import (
 )
 from .helpers import putPrompts, clearPrompts
 from .prompt_util import readJsonPrompt
+from .static_variables import promptTableHeaders
 
 
 def on_ui_tabs():
@@ -55,7 +56,7 @@ def on_ui_tabs():
 
                     main_prompts = gr.Dataframe(
                         type="array",
-                        headers=["Start at second [0,1,...]", "Prompt"],
+                        headers= promptTableHeaders,
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),

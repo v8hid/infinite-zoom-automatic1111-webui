@@ -2,6 +2,8 @@ import os
 from modules import scripts
 import modules.sd_samplers
 
+promptTableHeaders=["Start at second [0,1,...]","Prompt"]
+
 default_prompt = """
 {
 	"prePrompt": "Huge spectacular Waterfall in ",
