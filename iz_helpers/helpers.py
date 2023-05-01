@@ -107,7 +107,7 @@ def putPrompts(files):
             return [
                 gr.Textbox.update(data["prePrompt"]),
                 gr.DataFrame.update(data["prompts"]),
-                gr.Textbox.update(data["postPromt"]),
+                gr.Textbox.update(data["postPrompt"]),
                 gr.Textbox.update(data["negPrompt"])
             ]
 
