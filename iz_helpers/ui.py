@@ -42,7 +42,7 @@ def on_ui_tabs():
                             maximum=100,
                             step=1,
                             value=8,
-                            label="Total Outpaint Steps",
+                            label="Total video length [s]",
                         )
 
                     # safe reading json prompt
@@ -55,7 +55,7 @@ def on_ui_tabs():
 
                     main_prompts = gr.Dataframe(
                         type="array",
-                        headers=["outpaint step", "prompt"],
+                        headers=["Start at second [0,1,...]", "Prompt"],
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),
@@ -255,6 +255,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 ) = create_output_panel(
                     "infinite-zoom", shared.opts.outdir_img2img_samples
                 )
+                
         generate_btn.click(
             fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
             inputs=[
@@ -288,6 +289,17 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
-        interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
+        
+        main_prompts.change(fn=checkPrompts,inputs=[main_prompts], outputs=[generate_btn])
+        
+        interrupt.click(fn=shared.state.interrupt(), inputs=[], outputs=[])
     infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
+
+def checkPrompts(p):
+    return gr.Button.update(
+        interactive=
+        any(0 in sublist for sublist in p) 
+        or 
+        any('0' in sublist for sublist in p) 
+    )
