@@ -99,12 +99,10 @@ def on_ui_settings():
         "infzoom_collectAllResources",
         shared.OptionInfo(
             False,
-            "Store all images (txt2img, init_image,exit_image, inpainting, interpolation) and the movie into one folder in your OUTPUT Path",
+            "!!! Store all images (txt2img, init_image,exit_image, inpainting, interpolation) into one folder in your OUTPUT Path. Very slow, a lot of data. Dont do this on long runs !!!",
             gr.Checkbox,
             {"interactive": True},
             section=section,
         ),
     )
-        
-    
-    
+     
