@@ -51,7 +51,6 @@ def on_ui_tabs():
                             minimum=2,
                             maximum=100,
                             step=1,
-                            value=8,
                             label="Total video length [s]",
                             value=default_total_outpaints,
                             precision=0,
@@ -67,12 +66,13 @@ def on_ui_tabs():
                     )
                     main_prompts = gr.Dataframe(
                         type="array",                   
-                        headers= promptTableHeaders,
-                        datatype=["number", "str", "str", "str", "bool"],
+                        headers=promptTableHeaders[0],
+                        datatype=promptTableHeaders[1],
                         row_count=1,
                         col_count=(5, "fixed"),
                         value=jpr["prompts"],
                         wrap=True,
+                        elem_id = "infzoom_prompt_table",                        
                     )
 
                     main_common_prompt_suf = gr.Textbox(
@@ -242,8 +242,8 @@ def on_ui_tabs():
                         label="Upscale by factor",
                         minimum=1,
                         maximum=8,
-                        step=0.5,
-                        value=2,
+                        step=0.25,
+                        value=1,
                     )
                     with gr.Accordion("Help", open=False):
                         gr.Markdown(
@@ -299,7 +299,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
             fn=checkPrompts, inputs=[main_prompts], outputs=[generate_btn]
         )
 
-        interrupt.click(fn=shared.state.interrupt(), inputs=[], outputs=[])
+        interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
     infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
@@ -338,7 +338,8 @@ def check_create_zoom(
     if 0 not in keys:
         raise gr.Error("Ensure your prompt table has a step 9 (zero) prompt")
     
-    return create_zoom(                main_common_prompt_pre,
+    return create_zoom(                
+                main_common_prompt_pre,
                 main_prompts,
                 main_common_prompt_suf,
                 main_negative_prompt,

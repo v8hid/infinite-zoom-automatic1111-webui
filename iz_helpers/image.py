@@ -23,7 +23,7 @@ def shrink_and_paste_on_blank(current_image, mask_width, mask_height):
 
     # resize and paste onto blank image
     prev_image = current_image.resize((new_width, new_height))
-    blank_image = Image.new("RGBA", (width, height), (0, 0, 0, 1))
+    blank_image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     blank_image.paste(prev_image, (mask_width, mask_height))
 
     return blank_image
@@ -66,11 +66,21 @@ def apply_alpha_mask(image, mask_image):
         Image: A PIL Image object of the input image with the applied alpha mask.
     """
     # Resize the mask to match the current image size
-    mask_image = mask_image.resize(image.size)
+    mask_image = resize_and_crop_image(mask_image, image.width, image.height)
     # Apply the mask as the alpha layer of the current image
     result_image = image.copy()
     result_image.putalpha(mask_image.convert('L')) # convert to grayscale
     return result_image
+
+def convert_to_rgba(images):
+    rgba_images = []
+    for img in images:
+        if img.mode == 'RGB':
+            rgba_img = img.convert('RGBA')
+            rgba_images.append(rgba_img)
+        else:
+            rgba_images.append(img)
+    return rgba_images
 
 def resize_image_with_aspect_ratio(image: Image, basewidth: int = 512, baseheight: int = 512) -> Image:
     """
@@ -99,7 +109,7 @@ def resize_image_with_aspect_ratio(image: Image, basewidth: int = 512, baseheigh
     hsize = int((float(orig_height) * float(wpercent)))
     
     # Resize the image with Lanczos resampling filter
-    resized_image = image.resize((basewidth, hsize), resample=Image.LANCZOS)
+    resized_image = image.resize((basewidth, hsize), resample=Image.Resampling.LANCZOS)
 
     # If the height of the resized image is still larger than the given baseheight,
     # then crop the image from the top and bottom to match the baseheight
@@ -153,7 +163,7 @@ def resize_and_crop_image(image: Image, new_width: int = 512, new_height: int = 
         top_offset = (resized_height - new_height) // 2
 
     # Resize the image with Lanczos resampling filter
-    resized_image = image.resize((resized_width, resized_height), resample=Image.LANCZOS)
+    resized_image = image.resize((resized_width, resized_height), resample=Image.Resampling.LANCZOS)
 
     # Crop the image to fill the entire height and width of the new image
     cropped_image = resized_image.crop((left_offset, top_offset, left_offset + new_width, top_offset + new_height))
@@ -437,6 +447,6 @@ def crop_inner_image(image: Image, width_offset: int, height_offset: int) -> Ima
     )
 
     # Resize the cropped image to the original image size using Lanczos resampling
-    resized_image = cropped_image.resize((width, height), resample=Image.LANCZOS)
+    resized_image = cropped_image.resize((width, height), resample=Image.Resampling.LANCZOS)
 
     return resized_image

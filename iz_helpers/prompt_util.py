@@ -14,7 +14,7 @@ def completeOptionals(j):
         if "prompts" in j:
             if "headers" in j["prompts"]:
                 del j["prompts"]["headers"]
-            j["prompts"]["headers"]=promptTableHeaders
+            j["prompts"]["headers"]=promptTableHeaders[0]
             
         if "negPrompt" not in j:
             j["negPrompt"]=""

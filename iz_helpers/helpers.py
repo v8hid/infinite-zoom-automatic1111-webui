@@ -117,6 +117,7 @@ def putPrompts(files):
         )
         asyncio.run(
             showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5)
+        )
         return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update()]
 
 

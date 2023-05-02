@@ -8,11 +8,11 @@
     flex: 0 0 0%;
     width: 0;
 }
-.gradio-container-3-23-0 .gradio-dataframe input {
-    height: 90%;
-    width: 90%;
+.gradio-container-3-23-0 .gradio-dataframe input, #infzoom_prompt_table input {
+    height: 95%;
+    width: 95%;
 }
-.gradio-container-3-23-0 .gradio-dataframe .scroll-hide {
+.gradio-container-3-23-0 .gradio-dataframe .scroll-hide, #infzoom_prompt_table .scroll-hide  {
     scrollbar-width: unset;
 }
 #component-2115, #component-2065 .gradio-column:nth-child(1) {
