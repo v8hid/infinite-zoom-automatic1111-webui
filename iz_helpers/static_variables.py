@@ -32,7 +32,7 @@ invalid_prompt = {
         "data": [[0, "Your prompt-json is invalid, please check Settings"]],
     },
     "negPrompt": "Invalid prompt-json",
-    "prePromp": "Invalid prompt",
+    "prePrompt": "Invalid prompt",
     "postPrompt": "Invalid prompt",
 }
 
