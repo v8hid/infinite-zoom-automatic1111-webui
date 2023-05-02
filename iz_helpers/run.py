@@ -179,11 +179,8 @@ def create_zoom(
     video_zoom_mode,
     video_start_frame_dupe_amount,
     video_last_frame_dupe_amount,
-    inpainting_denoising_strength,
     inpainting_mask_blur,
     inpainting_fill_mode,
-    inpainting_full_res,
-    inpainting_padding,
     zoom_speed,
     seed,
     outputsizeW,
@@ -193,6 +190,9 @@ def create_zoom(
     upscale_do,
     upscaler_name,
     upscale_by,
+    inpainting_denoising_strength=1,
+    inpainting_full_res=False,
+    inpainting_padding=0,
     progress=None,
 ):
     for i in range(batchcount):
@@ -302,11 +302,8 @@ def create_zoom_single(
     video_zoom_mode,
     video_start_frame_dupe_amount,
     video_last_frame_dupe_amount,
-    inpainting_denoising_strength,
     inpainting_mask_blur,
     inpainting_fill_mode,
-    inpainting_full_res,
-    inpainting_padding,
     zoom_speed,
     seed,
     outputsizeW,
@@ -315,6 +312,9 @@ def create_zoom_single(
     upscale_do,
     upscaler_name,
     upscale_by,
+    inpainting_denoising_strength=1,
+    inpainting_full_res=False,
+    inpainting_padding=0,
     progress=None,
 ):
     # try:

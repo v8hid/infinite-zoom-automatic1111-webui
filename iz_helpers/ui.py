@@ -3,9 +3,15 @@ from .run import create_zoom
 import modules.shared as shared
 from webui import wrap_gradio_gpu_call
 from modules.ui import create_output_panel
+
 from .static_variables import (
     default_prompt,
     available_samplers,
+    default_total_outpaints,
+    default_sampling_steps,
+    default_cfg_scale,
+    default_mask_blur,
+    default_sampler,
 )
 from .helpers import putPrompts, clearPrompts
 from .prompt_util import readJsonPrompt
@@ -37,13 +43,11 @@ def on_ui_tabs():
                             step=1,
                             label="Batch Count",
                         )
-
-                        main_outpaint_steps = gr.Slider(
-                            minimum=1,
-                            maximum=100,
-                            step=1,
-                            value=8,
+                        main_outpaint_steps = gr.Number(
                             label="Total video length [s]",
+                            value=default_total_outpaints,
+                            precision=0,
+                            interactive=True,
                         )
 
                     # safe reading json prompt
@@ -56,7 +60,7 @@ def on_ui_tabs():
 
                     main_prompts = gr.Dataframe(
                         type="array",
-                        headers= promptTableHeaders,
+                        headers=promptTableHeaders,
                         datatype=["number", "str"],
                         row_count=1,
                         col_count=(2, "fixed"),
@@ -72,7 +76,7 @@ def on_ui_tabs():
                         value=jpr["negPrompt"], label="Negative Prompt"
                     )
 
-                    # these button will be moved using JS unde the dataframe view as small ones
+                    # these button will be moved using JS under the dataframe view as small ones
                     exportPrompts_button = gr.Button(
                         value="Export prompts",
                         variant="secondary",
@@ -132,7 +136,7 @@ def on_ui_tabs():
                             main_sampler = gr.Dropdown(
                                 label="Sampler",
                                 choices=available_samplers,
-                                value="Euler a",
+                                value=default_sampler,
                                 type="value",
                             )
                         with gr.Row():
@@ -155,14 +159,14 @@ def on_ui_tabs():
                                 minimum=0.1,
                                 maximum=15,
                                 step=0.1,
-                                value=7,
+                                value=default_cfg_scale,
                                 label="Guidance Scale",
                             )
                             sampling_step = gr.Slider(
                                 minimum=1,
-                                maximum=100,
+                                maximum=150,
                                 step=1,
-                                value=50,
+                                value=default_sampling_steps,
                                 label="Sampling Steps for each outpaint",
                             )
                         with gr.Row():
@@ -209,21 +213,17 @@ def on_ui_tabs():
                     )
 
                 with gr.Tab("Outpaint"):
-                    inpainting_denoising_strength = gr.Slider(
-                        label="Denoising Strength", minimum=0.75, maximum=1, value=1
-                    )
                     inpainting_mask_blur = gr.Slider(
-                        label="Mask Blur", minimum=0, maximum=64, value=0
+                        label="Mask Blur",
+                        minimum=0,
+                        maximum=64,
+                        value=default_mask_blur,
                     )
                     inpainting_fill_mode = gr.Radio(
                         label="Masked content",
                         choices=["fill", "original", "latent noise", "latent nothing"],
                         value="latent noise",
                         type="index",
-                    )
-                    inpainting_full_res = gr.Checkbox(label="Inpaint Full Resolution")
-                    inpainting_padding = gr.Slider(
-                        label="masked padding", minimum=0, maximum=256, value=0
                     )
 
                 with gr.Tab("Post proccess"):
@@ -234,7 +234,6 @@ def on_ui_tabs():
                         choices=[x.name for x in shared.sd_upscalers],
                         value=shared.sd_upscalers[0].name,
                     )
-
                     upscale_by = gr.Slider(
                         label="Upscale by factor", minimum=1, maximum=8, value=1
                     )
@@ -256,7 +255,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 ) = create_output_panel(
                     "infinite-zoom", shared.opts.outdir_img2img_samples
                 )
-                
+
         generate_btn.click(
             fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
             inputs=[
@@ -273,11 +272,8 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 video_zoom_mode,
                 video_start_frame_dupe_amount,
                 video_last_frame_dupe_amount,
-                inpainting_denoising_strength,
                 inpainting_mask_blur,
                 inpainting_fill_mode,
-                inpainting_full_res,
-                inpainting_padding,
                 video_zoom_speed,
                 seed,
                 main_width,
@@ -290,17 +286,18 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
-        
-        main_prompts.change(fn=checkPrompts,inputs=[main_prompts], outputs=[generate_btn])
-        
+
+        main_prompts.change(
+            fn=checkPrompts, inputs=[main_prompts], outputs=[generate_btn]
+        )
+
         interrupt.click(fn=shared.state.interrupt(), inputs=[], outputs=[])
     infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
+
 def checkPrompts(p):
     return gr.Button.update(
-        interactive=
-        any(0 in sublist for sublist in p) 
-        or 
-        any('0' in sublist for sublist in p) 
+        interactive=any(0 in sublist for sublist in p)
+        or any("0" in sublist for sublist in p)
     )
