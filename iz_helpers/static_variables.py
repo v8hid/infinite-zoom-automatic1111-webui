@@ -32,7 +32,7 @@ invalid_prompt = {
     },
     "negPrompt": "Invalid prompt-json",
     "prePromp": "Invalid prompt",
-    "postPrompt": "Invalid prompt"
+    "postPrompt": "Invalid prompt",
 }
 
 available_samplers = [
