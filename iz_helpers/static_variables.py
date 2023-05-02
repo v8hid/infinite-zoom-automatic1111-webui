@@ -4,7 +4,7 @@ import modules.sd_samplers
 
 default_sampling_steps = 35
 default_sampler = "DDIM"
-default_cfg_scale = "DDIM"
+default_cfg_scale = 8
 default_mask_blur = 48
 default_total_outpaints = 5
 promptTableHeaders = ["Start at second [0,1,...]", "Prompt"]
