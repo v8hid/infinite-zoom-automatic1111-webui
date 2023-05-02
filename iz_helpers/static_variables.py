@@ -36,7 +36,7 @@ invalid_prompt = {
         "headers": ["outpaint steps", "prompt","image location","blend mask location", "is keyframe"],
     },
     "negPrompt": "Invalid prompt-json",
-    "prePromp": "Invalid prompt",
+    "prePrompt": "Invalid prompt",
     "postPrompt": "Invalid prompt",
 }
 
