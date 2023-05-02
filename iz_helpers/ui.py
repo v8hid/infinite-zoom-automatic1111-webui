@@ -235,7 +235,11 @@ def on_ui_tabs():
                         value=shared.sd_upscalers[0].name,
                     )
                     upscale_by = gr.Slider(
-                        label="Upscale by factor", minimum=1, maximum=8, value=1
+                        label="Upscale by factor",
+                        minimum=1,
+                        maximum=8,
+                        step=0.5,
+                        value=2,
                     )
                     with gr.Accordion("Help", open=False):
                         gr.Markdown(
