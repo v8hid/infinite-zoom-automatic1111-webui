@@ -295,7 +295,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
             fn=checkPrompts, inputs=[main_prompts], outputs=[generate_btn]
         )
 
-        interrupt.click(fn=shared.state.interrupt(), inputs=[], outputs=[])
+        interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
     infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
