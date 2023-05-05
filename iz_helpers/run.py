@@ -43,6 +43,8 @@ def outpaint_steps(
     frame_correction=True,  # TODO: add frame_Correction in UI
 ):
     main_frames = [init_img.convert("RGB")]
+    main_frames[0] = init_img.convert("RGB")
+    prev_image = init_img.convert("RGB")
 
     for i in range(outpaint_steps):
         print_out = (
@@ -80,15 +82,15 @@ def outpaint_steps(
         #current_image = current_image.convert("RGB")
 
         #keyframes are not inpainted
-        paste_previous_image = not prompt_image_is_keyframe[max(k for k in prompt_image_is_keyframe.keys() if k <= (i + 0))]
+        paste_previous_image = not prompt_image_is_keyframe[max(k for k in prompt_image_is_keyframe.keys() if k <= (i + 1))]
 
         if custom_exit_image and ((i + 1) == outpaint_steps):
-            current_image = resize_and_crop_image(custom_exit_image, width, height)
-            main_frames.append(current_image.convert("RGB"))
+            current_image = resize_and_crop_image(custom_exit_image, width, height).convert("RGBA")
+            main_frames.append(current_image)
             print("using Custom Exit Image")
-            save2Collect(main_frames[i], out_config, f"exit_img.png")
+            save2Collect(current_image, out_config, f"exit_img.png")
         else:
-            if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 0))] == "":
+            if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))] == "":
                 pr = prompts[max(k for k in prompts.keys() if k <= i)]
                 processed, seed = renderImg2Img(
                     f"{common_prompt_pre}\n{pr}\n{common_prompt_suf}".strip(),
@@ -108,16 +110,17 @@ def outpaint_steps(
                     inpainting_padding,
                 )
                 if len(processed.images) > 0:
-                    main_frames.append(processed.images[0])
+                    main_frames.append(processed.images[0].convert("RGBA"))
                     save2Collect(processed.images[0], out_config, f"outpain_step_{i}.png")
 
                 paste_previous_image = True
             else:
                 # use prerendered image, known as keyframe. Resize to target size
-                print(f"image {i} is a keyframe")
-                current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 0))])
-                main_frames.append(resize_and_crop_image(current_image, width, height))
-                save2Collect(main_frames[i], out_config, f"key_frame_{i}.png")                
+                print(f"image {i + 1} is a keyframe: {not paste_previous_image}")
+                current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))])
+                current_image = resize_and_crop_image(current_image, width, height).convert("RGBA")
+                main_frames.append(current_image)
+                save2Collect(current_image, out_config, f"key_frame_{i + 1}.png")                
 
         #seed = newseed
         # TODO: seed behavior
@@ -140,16 +143,20 @@ def outpaint_steps(
             main_frames[i] = corrected_frame
         else: #TEST
             # apply available alpha mask of previous image
-            if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 0))] != "":
-                current_image = apply_alpha_mask(main_frames[i], open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 0))]))
+            if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
+                current_image = apply_alpha_mask(main_frames[i + 1], open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))]))
             else:
                 current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.615 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
-                current_image = apply_alpha_mask(main_frames[i], draw_gradient_ellipse(main_frames[i].width, main_frames[i].height, current_image_gradient_ratio, 0.0, 2.0))
-            save2Collect(current_image, out_config, f"main_frame_gradient_{i}")
-            main_frames[i] = current_image
-            # paste previous image on current image
-            #if paste_previous_image:
+                current_image = apply_alpha_mask(main_frames[i + 1], draw_gradient_ellipse(main_frames[i + 1].width, main_frames[i + 1].height, current_image_gradient_ratio, 0.0, 2.0))
+
+            # paste current image with alpha layer on previous image to merge
             #current_image.paste(prev_image, mask=prev_image)
+            if paste_previous_image:
+                prev_image = (main_frames[i] if main_frames[i] else main_frames[0]).convert("RGBA")
+                current_image.alpha_composite(prev_image)
+            
+            main_frames[i] = current_image
+            save2Collect(current_image, out_config, f"main_frame_gradient_{i + 1}")
 
     return main_frames, processed
 
@@ -217,14 +224,6 @@ def create_zoom(
         )
     return result
 
-
-def save2Collect(img, out_config, name):
-    if out_config["isCollect"]:
-        img.save(f'{out_config["save_path"]}/{name}.png')
-
-
-def frame2Collect(all_frames, out_config):
-    save2Collect(all_frames[-1], out_config, f"frame_{len(all_frames)}")
 
 def prepare_output_path():
     isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
@@ -324,7 +323,8 @@ def create_zoom_single(
 
     assert len(prompts_array) > 0, "prompts is empty"
     print(str(len(prompts)) + " prompts found")
-    print(str(len(prompt_images)) + " prompts Images found")
+    print(str(len([value for value in prompt_images.values() if value != ""])) + " prompt Images found")
+    print(str(len([value for value in prompt_alpha_mask_images.values() if value != ""])) + " prompt Alpha Masks found")
 
     width = closest_upper_divisible_by_eight(outputsizeW)
     height = closest_upper_divisible_by_eight(outputsizeH)
@@ -413,7 +413,8 @@ def create_zoom_single(
     )
 
     #for k in range(len(main_frames)):
-    #    resize_and_crop_image(main_frames[k], width, height)        
+        #print(str(f"Frame {k} : {main_frames[k]}"))
+        #resize_and_crop_image(main_frames[k], width, height)        
 
     all_frames.append(
         do_upscaleImg(main_frames[0], upscale_do, upscaler_name, upscale_by)

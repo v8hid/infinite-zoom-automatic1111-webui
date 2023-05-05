@@ -2,7 +2,7 @@
 
 infzoom_titles = {
     "Batch Count":"How many separate videos to create",
-    "Total video length [s]":"For each seconds frame (FPS) will be generated. Define prompts at which time they should start wihtin this duration.",
+    "Total video length [s]":"For each seconds frame (FPS) will be generated. Define prompts at which time they should start wihtin this duration. Do not count frame zero.",
     "Common Prompt Prefix":"Prompt inserted before each step",
     "Common Prompt Suffix":"Prompt inserted after each step",
     "Negative Prompt":"What your model shall avoid",
