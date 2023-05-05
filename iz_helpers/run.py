@@ -14,7 +14,6 @@ from .sd_helpers import renderImg2Img, renderTxt2Img
 from .image import shrink_and_paste_on_blank
 from .video import write_video
 
-
 def crop_fethear_ellipse(image, feather_margin=30, width_offset=0, height_offset=0):
     # Create a blank mask image with the same size as the original image
     mask = Image.new("L", image.size, 0)
@@ -89,6 +88,7 @@ def outpaint_steps(
     mask_width,
     mask_height,
     custom_exit_image,
+    overmask,
     frame_correction=True,  # TODO: add frame_Correction in UI
 ):
     main_frames = [init_img.convert("RGB")]
@@ -108,7 +108,7 @@ def outpaint_steps(
             current_image, mask_width, mask_height
         )
 
-        mask_image = np.array(current_image)[:, :, 3]
+        mask_image = np.array(current_image.resize((current_image.width-overmask, current_image.height-overmask)))[:, :, 3]
         mask_image = Image.fromarray(255 - mask_image).convert("RGB")
         # create mask (black image with white mask_width width edges)
 
@@ -190,6 +190,7 @@ def create_zoom(
     upscale_do,
     upscaler_name,
     upscale_by,
+    overmask,
     inpainting_denoising_strength=1,
     inpainting_full_res=0,
     inpainting_padding=0,
@@ -221,6 +222,7 @@ def create_zoom(
             upscale_do,
             upscaler_name,
             upscale_by,
+            overmask,
             inpainting_denoising_strength,
             inpainting_full_res,
             inpainting_padding,
@@ -312,6 +314,7 @@ def create_zoom_single(
     upscale_do,
     upscaler_name,
     upscale_by,
+    overmask,
     inpainting_denoising_strength,
     inpainting_full_res,
     inpainting_padding,
@@ -409,12 +412,14 @@ def create_zoom_single(
         mask_width,
         mask_height,
         custom_exit_image,
+        overmask
     )
     all_frames.append(
         do_upscaleImg(main_frames[0], upscale_do, upscaler_name, upscale_by)
         if upscale_do
         else main_frames[0]
     )
+    
     for i in range(len(main_frames) - 1):
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
@@ -477,20 +482,9 @@ def create_zoom_single(
             if upscale_do and progress:
                 progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
 
-            all_frames.append(
-                do_upscaleImg(interpol_image, upscale_do, upscaler_name, upscale_by)
-                if upscale_do
-                else interpol_image
-            )
+            all_frames.append(interpol_image)
 
-        if upscale_do and progress:
-            progress(((i + 1) / num_outpainting_steps), desc="upscaling current")
-
-        all_frames.append(
-            do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
-            if upscale_do
-            else current_image
-        )
+        all_frames.append(current_image)
 
     frames2Collect(all_frames, out_config)
 

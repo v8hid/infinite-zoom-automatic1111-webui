@@ -12,6 +12,7 @@ from .static_variables import (
     default_cfg_scale,
     default_mask_blur,
     default_sampler,
+    default_overmask
 )
 from .helpers import putPrompts, clearPrompts
 from .prompt_util import readJsonPrompt
@@ -219,6 +220,12 @@ def on_ui_tabs():
                         maximum=64,
                         value=default_mask_blur,
                     )
+                    overmask = gr.Slider(
+                        label="Overmask (px) paint a bit into centered image",
+                        minimum=0,
+                        maximum=64,
+                        value=default_overmask,
+                    )
                     inpainting_fill_mode = gr.Radio(
                         label="Masked content",
                         choices=["fill", "original", "latent noise", "latent nothing"],
@@ -287,6 +294,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 upscale_do,
                 upscaler_name,
                 upscale_by,
+                overmask
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
