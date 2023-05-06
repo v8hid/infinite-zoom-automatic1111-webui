@@ -412,7 +412,7 @@ def create_zoom_single(
     
     if (upscale_do):
         for idx,mf in enumerate(main_frames):
-            print (f"InfZoom: Upscaling mainframe: {idx}   \r")
+            print (f"\033[KInfZoom: Upscaling mainframe: {idx}   \r")
             main_frames[idx]=do_upscaleImg(mf, upscale_do, upscaler_name, upscale_by)
 
         width  = main_frames[0].width
@@ -444,7 +444,7 @@ def interpolateFrames(out_config, width, height, mask_width, mask_height, num_in
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
 
-            print (f"InfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
+            print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
             #todo: howto zoomIn when writing each frame; main_frames are inverted, howto interpolate?
             if zoomIn:
                 current_image = main_frames[i + 1]
