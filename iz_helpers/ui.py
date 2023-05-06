@@ -183,6 +183,7 @@ def on_ui_tabs():
                         value=30,
                         minimum=1,
                         maximum=60,
+                        step=1
                     )
                     video_zoom_mode = gr.Radio(
                         label="Zoom mode",
@@ -196,6 +197,7 @@ def on_ui_tabs():
                         value=0,
                         minimum=1,
                         maximum=60,
+                        step=1
                     )
                     video_last_frame_dupe_amount = gr.Slider(
                         label="number of last frame dupe",
@@ -203,6 +205,7 @@ def on_ui_tabs():
                         value=0,
                         minimum=1,
                         maximum=60,
+                        step=1
                     )
                     video_zoom_speed = gr.Slider(
                         label="Zoom Speed",
@@ -218,12 +221,14 @@ def on_ui_tabs():
                         label="Mask Blur",
                         minimum=0,
                         maximum=64,
+                        step=1,
                         value=default_mask_blur,
                     )
                     overmask = gr.Slider(
                         label="Overmask (px) paint a bit into centered image",
                         minimum=0,
                         maximum=64,
+                        step=1,
                         value=default_overmask,
                     )
                     inpainting_fill_mode = gr.Radio(

@@ -12,7 +12,7 @@ from .helpers import (
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
 from .image import shrink_and_paste_on_blank
-from .video import write_video
+from .video import ContinuousVideoWriter
 
 def crop_fethear_ellipse(image, feather_margin=30, width_offset=0, height_offset=0):
     # Create a blank mask image with the same size as the original image
@@ -382,11 +382,6 @@ def create_zoom_single(
 
     num_interpol_frames = round(video_frame_rate * zoom_speed)
 
-    all_frames = []
-
-    if upscale_do and progress:
-        progress(0, desc="upscaling inital image")
-
     load_model_from_setting(
         "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
     )
@@ -416,27 +411,24 @@ def create_zoom_single(
     )
     
     if (upscale_do):
-        for mf,idx in main_frames:
+        for idx,mf in enumerate(main_frames):
+            print (f"InfZoom: Upscaling mainframe: {idx}   \r")
             main_frames[idx]=do_upscaleImg(mf, upscale_do, upscaler_name, upscale_by)
+
         width  = main_frames[0].width
         height = main_frames[0].height
         mask_width = width/4
         mask_height = height/4
 
-    all_frames.append(main_frames[0])
+    if video_zoom_mode:
+        main_frames = main_frames[::-1]
+
+    contVW = ContinuousVideoWriter(out_config["video_filename"], main_frames[0],video_frame_rate,int(video_start_frame_dupe_amount))
     
-    interpolateFrames(num_outpainting_steps, progress, out_config, width, height, mask_width, mask_height, num_interpol_frames, all_frames, main_frames)
+    interpolateFrames(out_config, width, height, mask_width, mask_height, num_interpol_frames, contVW, main_frames, video_zoom_mode)
 
-    frames2Collect(all_frames, out_config)
+    contVW.finish(main_frames[-1],int(video_last_frame_dupe_amount))
 
-    write_video(
-        out_config["video_filename"],
-        all_frames,
-        video_frame_rate,
-        video_zoom_mode,
-        int(video_start_frame_dupe_amount),
-        int(video_last_frame_dupe_amount),
-    )
     print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
 
     return (
@@ -447,11 +439,18 @@ def create_zoom_single(
         plaintext_to_html(""),
     )
 
-def interpolateFrames(num_outpainting_steps, progress, out_config, width, height, mask_width, mask_height, num_interpol_frames, all_frames, main_frames):
+def interpolateFrames(out_config, width, height, mask_width, mask_height, num_interpol_frames, contVW, main_frames, zoomIn):
     for i in range(len(main_frames) - 1):
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
-            current_image = main_frames[i + 1]
+
+            print (f"InfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
+            #todo: howto zoomIn when writing each frame; main_frames are inverted, howto interpolate?
+            if zoomIn:
+                current_image = main_frames[i + 1]
+            else:
+                current_image = main_frames[i + 1]
+                
             interpol_image = current_image
             save2Collect(interpol_image, out_config, f"interpol_img_{i}_{j}].png")
 
@@ -507,6 +506,6 @@ def interpolateFrames(num_outpainting_steps, progress, out_config, width, height
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
             save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
 
-            all_frames.append(interpol_image)
+            contVW.append([interpol_image])
 
-        all_frames.append(current_image)
+        contVW.append([current_image])
