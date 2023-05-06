@@ -54,7 +54,7 @@ def open_image(image_path):
     
     return img
 
-def apply_alpha_mask(image, mask_image):
+def apply_alpha_mask(image, mask_image, invert = False):
     """
     Applies a mask image as the alpha channel of the input image.
 
@@ -66,10 +66,12 @@ def apply_alpha_mask(image, mask_image):
         Image: A PIL Image object of the input image with the applied alpha mask.
     """
     # Resize the mask to match the current image size
-    mask_image = resize_and_crop_image(mask_image, image.width, image.height)
+    mask_image = resize_and_crop_image(mask_image, image.width, image.height).convert('L') # convert to grayscale
+    if invert:
+        ImageEnhance.Contrast(mask_image).enhance(-1.0)
     # Apply the mask as the alpha layer of the current image
-    result_image = image.copy()
-    result_image.putalpha(mask_image.convert('L')) # convert to grayscale
+    result_image = image.copy() 
+    result_image.putalpha(mask_image) 
     return result_image
 
 def convert_to_rgba(images):
