@@ -118,7 +118,7 @@ def outpaint_steps(
                 paste_previous_image = True
             else:
                 # use prerendered image, known as keyframe. Resize to target size
-                print(f"image {i + 1} is a keyframe: Full:{not paste_previous_image}")
+                print(f"image {i + 1} is a keyframe: Paste Previous:{not paste_previous_image}")
                 current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))])
                 current_image = resize_and_crop_image(current_image, width, height).convert("RGBA")
                 main_frames.append(current_image)
@@ -145,7 +145,7 @@ def outpaint_steps(
             main_frames[i] = corrected_frame
         else: #TEST
             # paste current image with alpha layer on previous image to merge            
-            if paste_previous_image and i > 0: #and not prompt_image_is_keyframe[max(k for k in prompt_image_is_keyframe.keys() if k <= (i + 0))]:
+            if paste_previous_image and i > 0:
                 # apply predefined or generated alpha mask to current image
                 if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
                     current_image = apply_alpha_mask(main_frames[i + 1], open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))]))
@@ -180,6 +180,9 @@ def outpaint_steps(
                 save2Collect(current_image, out_config, f"main_frame_gradient_{i + 1}")
             
             if (not paste_previous_image) and ((i + 1) == outpaint_steps):
+                # fix initial image by adding alpha layer
+
+                # fix exit image and frames
                 backward_image = shrink_and_paste_on_blank(
                     current_image, mask_width, mask_height
                 )
@@ -201,7 +204,7 @@ def outpaint_steps(
             #input("Press Enter to continue...")
 
     # Remove extra frames
-    main_frames = main_frames[:(outpaint_steps + 1)]
+    main_frames = main_frames[:(outpaint_steps)]
     return main_frames, processed
 
 
@@ -426,7 +429,7 @@ def create_zoom_single(
     )
 
     if custom_exit_image:
-        extra_frames += 2
+        extra_frames += 1
 
     main_frames, processed = outpaint_steps(
         width,
@@ -553,6 +556,8 @@ def create_zoom_single(
         video_zoom_mode,
         int(video_start_frame_dupe_amount),
         int(video_last_frame_dupe_amount),
+        num_interpol_frames,
+        True
     )
     print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
     return (

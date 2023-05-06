@@ -4,7 +4,7 @@ import modules.shared as shared
 import modules.sd_models
 import gradio as gr
 from scripts import postprocessing_upscale
-from .prompt_util import readJsonPrompt
+from .prompt_util import readJsonPrompt, process_keys
 from .static_variables import jsonprompt_schemafile
 import asyncio
 
@@ -98,17 +98,19 @@ def validatePromptJson_throws(data):
         schema = json.load(s)
     validate(instance=data, schema=schema)
 
-def putPrompts(files):
+def putPrompts(files):                
     try:
         with open(files.name, "r") as f:
             file_contents = f.read()
 
             data = readJsonPrompt(file_contents,False)
+            prompts_keys = process_keys(data["prompts"]["data"])
             return [
                 gr.Textbox.update(data["prePrompt"]),
                 gr.DataFrame.update(data["prompts"]),
                 gr.Textbox.update(data["postPrompt"]),
-                gr.Textbox.update(data["negPrompt"])
+                gr.Textbox.update(data["negPrompt"]),
+                gr.Slider.update(value=prompts_keys[0]),
             ]
 
     except Exception:

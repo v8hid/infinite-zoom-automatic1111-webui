@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageDraw, ImageFont, ImageOps
 import requests
 import base64
 import numpy as np
@@ -452,3 +452,35 @@ def crop_inner_image(image: Image, width_offset: int, height_offset: int) -> Ima
     resized_image = cropped_image.resize((width, height), resample=Image.Resampling.LANCZOS)
 
     return resized_image
+
+def blend_images(start_image: Image, stop_image: Image, gray_image: Image, num_frames: int) -> list:
+    """
+    Blend two images together by using the gray image as the alpha amount of each frame.
+    This function takes in three parameters:
+    - start_image: the starting PIL image in RGBA mode
+    - stop_image: the target PIL image in RGBA mode
+    - gray_image: a gray scale PIL image of the same size as start_image and stop_image
+    - num_frames: the number of frames to generate in the blending animation
+    
+    The function returns a list of PIL images representing the blending animation.
+    """
+    # Initialize the list of blended frames
+    blended_frames = []
+
+    #set alpha layers of images to be blended
+    start_image = apply_alpha_mask(start_image, gray_image)
+    stop_image = apply_alpha_mask(stop_image, gray_image, invert = True)
+
+    # Generate each frame of the blending animation
+    for i in range(num_frames):
+        # Calculate the alpha amount for this frame
+        alpha = i / float(num_frames - 1)
+
+        # Blend the two images using the alpha amount
+        blended_image = Image.blend(start_image, stop_image, alpha)
+
+        # Append the blended frame to the list
+        blended_frames.append(blended_image)
+
+    # Return the list of blended frames
+    return blended_frames

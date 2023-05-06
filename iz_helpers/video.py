@@ -1,8 +1,9 @@
 import numpy as np
 import imageio
-from PIL import Image
+from .image import blend_images, draw_gradient_ellipse
+import math
 
-def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30):
+def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30, num_interpol_frames=2, blend=False, blend_image= None):
     """
     Writes frames to an mp4 video file
     :param file_path: Path to output video, must end with .mp4
@@ -20,8 +21,18 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
     writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)
 
     # Duplicate the start and end frames
-    start_frames = [frames[0]] * start_frame_dupe_amount
-    end_frames = [frames[-1]] * last_frame_dupe_amount
+    if blend:        
+        if blend_image is None:
+            blend_image = draw_gradient_ellipse(*frames[0].size, 0.63)
+        next_frame = frames[num_interpol_frames]
+        next_to_last_frame = frames[-num_interpol_frames]
+        print(f"Blending start: {math.ceil(start_frame_dupe_amount)}")
+        start_frames = blend_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
+        print(f"Blending end: {math.ceil(last_frame_dupe_amount)}")
+        end_frames = blend_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
+    else:
+        start_frames = [frames[0]] * start_frame_dupe_amount
+        end_frames = [frames[-1]] * last_frame_dupe_amount    
 
     # Write the duplicated frames to the video writer
     for frame in start_frames:

@@ -5,7 +5,7 @@ import modules.sd_samplers
 default_sampling_steps = 35
 default_sampler = "DDIM"
 default_cfg_scale = 8
-default_mask_blur = 48
+default_mask_blur = 60
 default_total_outpaints = 5
 promptTableHeaders = ["Outpaint Steps", "Prompt", "image location", "blend mask", "is keyframe"], ["number", "str", "str", "str", "bool"]
 

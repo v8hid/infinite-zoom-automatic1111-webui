@@ -114,6 +114,7 @@ def on_ui_tabs():
                             main_prompts,
                             main_common_prompt_suf,
                             main_negative_prompt,
+                            main_outpaint_steps,
                         ],
                         inputs=[importPrompts_button],
                     )

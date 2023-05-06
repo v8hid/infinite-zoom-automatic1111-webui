@@ -5,8 +5,17 @@ from .static_variables import (
     empty_prompt,
     invalid_prompt,
     jsonprompt_schemafile,
-    promptTableHeaders
+    promptTableHeaders,
+    default_total_outpaints,
 )
+prompts_keys = (default_total_outpaints, default_total_outpaints)
+
+def process_keys(data):
+    #data = json.loads(txt)['data']
+    keys = [int(sublist[0]) for sublist in data]
+    max_key = max(keys)
+    num_keys = len(keys)
+    return (max_key, num_keys)
 
 def completeOptionals(j):
     if isinstance(j, dict):
@@ -32,7 +41,6 @@ def completeOptionals(j):
                 j["postPrompt"]=""
 
     return j
-
 
 def validatePromptJson_throws(data):
     with open(jsonprompt_schemafile, "r") as s:
