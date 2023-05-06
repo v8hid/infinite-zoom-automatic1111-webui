@@ -414,12 +414,40 @@ def create_zoom_single(
         custom_exit_image,
         overmask
     )
-    all_frames.append(
-        do_upscaleImg(main_frames[0], upscale_do, upscaler_name, upscale_by)
-        if upscale_do
-        else main_frames[0]
-    )
     
+    if (upscale_do):
+        for mf,idx in main_frames:
+            main_frames[idx]=do_upscaleImg(mf, upscale_do, upscaler_name, upscale_by)
+        width  = main_frames[0].width
+        height = main_frames[0].height
+        mask_width = width/4
+        mask_height = height/4
+
+    all_frames.append(main_frames[0])
+    
+    interpolateFrames(num_outpainting_steps, progress, out_config, width, height, mask_width, mask_height, num_interpol_frames, all_frames, main_frames)
+
+    frames2Collect(all_frames, out_config)
+
+    write_video(
+        out_config["video_filename"],
+        all_frames,
+        video_frame_rate,
+        video_zoom_mode,
+        int(video_start_frame_dupe_amount),
+        int(video_last_frame_dupe_amount),
+    )
+    print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
+
+    return (
+        out_config["video_filename"],
+        main_frames,
+        processed.js(),
+        plaintext_to_html(processed.info),
+        plaintext_to_html(""),
+    )
+
+def interpolateFrames(num_outpainting_steps, progress, out_config, width, height, mask_width, mask_height, num_interpol_frames, all_frames, main_frames):
     for i in range(len(main_frames) - 1):
         # interpolation steps between 2 inpainted images (=sequential zoom and crop)
         for j in range(num_interpol_frames - 1):
@@ -479,28 +507,6 @@ def create_zoom_single(
             interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
             save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
 
-            if upscale_do and progress:
-                progress(((i + 1) / num_outpainting_steps), desc="upscaling interpol")
-
             all_frames.append(interpol_image)
 
         all_frames.append(current_image)
-
-    frames2Collect(all_frames, out_config)
-
-    write_video(
-        out_config["video_filename"],
-        all_frames,
-        video_frame_rate,
-        video_zoom_mode,
-        int(video_start_frame_dupe_amount),
-        int(video_last_frame_dupe_amount),
-    )
-    print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
-    return (
-        out_config["video_filename"],
-        main_frames,
-        processed.js(),
-        plaintext_to_html(processed.info),
-        plaintext_to_html(""),
-    )
