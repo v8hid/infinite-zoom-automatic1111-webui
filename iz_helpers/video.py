@@ -21,15 +21,20 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
     writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)
 
     # Duplicate the start and end frames
-    if blend:        
+    if blend:
+        num_frames_replaced = num_interpol_frames + 2
         if blend_image is None:
             blend_image = draw_gradient_ellipse(*frames[0].size, 0.63)
-        next_frame = frames[num_interpol_frames]
-        next_to_last_frame = frames[-num_interpol_frames]
-        print(f"Blending start: {math.ceil(start_frame_dupe_amount)}")
+        next_frame = frames[num_frames_replaced]
+        next_to_last_frame = frames[(-1 * num_frames_replaced)]
+        
+        print(f"Blending start: {math.ceil(start_frame_dupe_amount)} next frame:{(num_interpol_frames -1)}")
         start_frames = blend_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
-        print(f"Blending end: {math.ceil(last_frame_dupe_amount)}")
+        del frames[:num_frames_replaced]
+
+        print(f"Blending end: {math.ceil(last_frame_dupe_amount)} next to last frame:{-1 * (num_interpol_frames + 1)}")
         end_frames = blend_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
+        frames = frames[:(-1 * num_frames_replaced)]
     else:
         start_frames = [frames[0]] * start_frame_dupe_amount
         end_frames = [frames[-1]] * last_frame_dupe_amount    

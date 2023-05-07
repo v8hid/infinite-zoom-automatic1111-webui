@@ -45,6 +45,7 @@ def outpaint_steps(
     main_frames = [init_img.convert("RGBA")]
     main_frames[0] = init_img.convert("RGBA")
     prev_image = init_img.convert("RGBA")
+    exit_img = custom_exit_image.convert("RGBA") if custom_exit_image else None
 
     for i in range(outpaint_steps):
         print_out = (
@@ -118,11 +119,16 @@ def outpaint_steps(
                 paste_previous_image = True
             else:
                 # use prerendered image, known as keyframe. Resize to target size
-                print(f"image {i + 1} is a keyframe: Paste Previous:{not paste_previous_image}")
+                print(f"image {i + 1} is a keyframe: {not paste_previous_image}")
                 current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))])
                 current_image = resize_and_crop_image(current_image, width, height).convert("RGBA")
+
+                # if keyframe is last frame, use it as exit image
+                if (not paste_previous_image) and ((i + 1) == outpaint_steps):
+                    exit_img = current_image
+                    print("using keyframe as exit image")
                 main_frames.append(current_image)
-                save2Collect(current_image, out_config, f"key_frame_{i + 1}.png")                
+                save2Collect(current_image, out_config, f"key_frame_{i + 1}.png")           
 
         #seed = newseed
         # TODO: seed behavior
@@ -145,7 +151,7 @@ def outpaint_steps(
             main_frames[i] = corrected_frame
         else: #TEST
             # paste current image with alpha layer on previous image to merge            
-            if paste_previous_image and i > 0:
+            if paste_previous_image:
                 # apply predefined or generated alpha mask to current image
                 if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
                     current_image = apply_alpha_mask(main_frames[i + 1], open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))]))
@@ -153,8 +159,9 @@ def outpaint_steps(
                     current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.615 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
                     current_image = apply_alpha_mask(main_frames[i + 1], draw_gradient_ellipse(main_frames[i + 1].width, main_frames[i + 1].height, current_image_gradient_ratio, 0.0, 2.0))
 
-                #handle previous image alpha layer
+                # handle previous image alpha layer
                 prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
+
                 # apply available alpha mask of previous image (inverted)
                 if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i))] != "":
                     prev_image = apply_alpha_mask(prev_image, open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i))]), invert = True)
@@ -179,17 +186,17 @@ def outpaint_steps(
                 main_frames[i] = current_image
                 save2Collect(current_image, out_config, f"main_frame_gradient_{i + 1}")
             
-            if (not paste_previous_image) and ((i + 1) == outpaint_steps):
-                # fix initial image by adding alpha layer
+            #if (not paste_previous_image) and ((i + 1) == outpaint_steps):
+            #    # fix initial image by adding alpha layer
 
-                # fix exit image and frames
-                backward_image = shrink_and_paste_on_blank(
-                    current_image, mask_width, mask_height
-                )
-                #handle previous image alpha layer
-                prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
-                prev_image.alpha_composite(backward_image)
-                main_frames[i - 1] = prev_image
+            #    # fix exit image and frames
+            #    backward_image = shrink_and_paste_on_blank(
+            #        current_image, mask_width, mask_height
+            #    )
+            #    #handle previous image alpha layer
+            #    prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
+            #    prev_image.alpha_composite(backward_image)
+            #    main_frames[i - 1] = prev_image
  
             #print(str(f"Frames: {len(main_frames)}"))
             #print(str(f"Frame previous : {prev_image} {prev_image.mode} ({prev_image.width}, {prev_image.height})"))
@@ -205,6 +212,12 @@ def outpaint_steps(
 
     # Remove extra frames
     main_frames = main_frames[:(outpaint_steps)]
+    #handle first and last frames, this ensures blends work properly
+    if init_img is not None:
+        main_frames.insert(0, init_img)
+    if exit_img is not None:
+        main_frames.append(exit_img)
+
     return main_frames, processed
 
 
@@ -542,9 +555,10 @@ def create_zoom_single(
             progress(((i + 1) / num_outpainting_steps), desc="upscaling current")
 
         all_frames.append(
-            do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
-            if upscale_do
-            else current_image
+            #do_upscaleImg(current_image, upscale_do, upscaler_name, upscale_by)
+            #if upscale_do
+            #else 
+            current_image
         )
 
     frames2Collect(all_frames, out_config)
