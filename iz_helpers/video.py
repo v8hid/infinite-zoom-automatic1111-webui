@@ -37,7 +37,7 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
         print(f"Blending end: {math.ceil(last_frame_dupe_amount)} next to last frame:{-1 * (num_interpol_frames + 1)}")
         #end_frames = alpha_composite_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
         #end_frames = luma_wipe_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
-        end_frames = PSLumaWipe_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount,(200,200,0,128)))
+        end_frames = PSLumaWipe_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount),(200,200,0,128))
         frames = frames[:(-1 * num_frames_replaced)]
     else:
         start_frames = [frames[0]] * start_frame_dupe_amount
