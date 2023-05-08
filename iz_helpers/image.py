@@ -672,5 +672,5 @@ def PSLumaWipe_images(start_image: Image, stop_image: Image, luma_wipe_image: Im
                 transition.putpixel((x, y), pixel)
         lw_frames.append(transition)
         print(f"Luma Wipe frame:{len(lw_frames)}")
-        lw_frames[-1].show()
+        #lw_frames[-1].show()
     return lw_frames
