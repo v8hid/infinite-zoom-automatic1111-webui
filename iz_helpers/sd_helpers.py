@@ -2,7 +2,6 @@ from modules.processing import (
     process_images,
     StableDiffusionProcessingTxt2Img,
     StableDiffusionProcessingImg2Img,
-    Processed
 )
 import modules.shared as shared
 

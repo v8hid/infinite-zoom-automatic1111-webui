@@ -117,9 +117,9 @@ def putPrompts(files):
         print(
             "[InfiniteZoom:] Loading your prompt failed. It seems to be invalid. Your prompt table is preserved."
         )
-        asyncio.run(
-            showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5)
-        )
+        # error only be shown with raise, so ui gets broken.
+        #asyncio.run(showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5))
+
         return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update()]
 
 

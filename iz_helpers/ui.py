@@ -187,6 +187,7 @@ def on_ui_tabs():
                         value=30,
                         minimum=1,
                         maximum=60,
+                        step=1
                     )
                     video_zoom_mode = gr.Radio(
                         label="Zoom mode",
@@ -200,6 +201,7 @@ def on_ui_tabs():
                         value=0,
                         minimum=1,
                         maximum=60,
+                        step=1
                     )
                     video_last_frame_dupe_amount = gr.Slider(
                         label="number of last frame dupe",
@@ -207,6 +209,7 @@ def on_ui_tabs():
                         value=0,
                         minimum=1,
                         maximum=60,
+                        step=1
                     )
                     video_zoom_speed = gr.Slider(
                         label="Zoom Speed",
@@ -223,6 +226,7 @@ def on_ui_tabs():
                         minimum=0,
                         maximum=64,
                         value=default_mask_blur,
+                        step=1
                     )
                     inpainting_fill_mode = gr.Radio(
                         label="Masked content",
@@ -304,70 +308,6 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
     infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]
 
-
-
-def check_create_zoom(
-                main_common_prompt_pre,
-                main_prompts,
-                main_common_prompt_suf,
-                main_negative_prompt,
-                main_outpaint_steps,
-                main_guidance_scale,
-                sampling_step,
-                init_image,
-                exit_image,
-                video_frame_rate,
-                video_zoom_mode,
-                video_start_frame_dupe_amount,
-                video_last_frame_dupe_amount,
-                inpainting_denoising_strength,
-                inpainting_mask_blur,
-                inpainting_fill_mode,
-                inpainting_full_res,
-                inpainting_padding,
-                video_zoom_speed,
-                seed,
-                main_width,
-                main_height,
-                batchcount_slider,
-                main_sampler,
-                upscale_do,
-                upscaler_name,
-                upscale_by, 
-):
-    keys = main_prompts.keys()
-    if 0 not in keys:
-        raise gr.Error("Ensure your prompt table has a step 9 (zero) prompt")
-    
-    return create_zoom(                
-                main_common_prompt_pre,
-                main_prompts,
-                main_common_prompt_suf,
-                main_negative_prompt,
-                main_outpaint_steps,
-                main_guidance_scale,
-                sampling_step,
-                init_image,
-                exit_image,
-                video_frame_rate,
-                video_zoom_mode,
-                video_start_frame_dupe_amount,
-                video_last_frame_dupe_amount,
-                inpainting_denoising_strength,
-                inpainting_mask_blur,
-                inpainting_fill_mode,
-                inpainting_full_res,
-                inpainting_padding,
-                video_zoom_speed,
-                seed,
-                main_width,
-                main_height,
-                batchcount_slider,
-                main_sampler,
-                upscale_do,
-                upscaler_name,
-                upscale_by,
-    )
 
 def checkPrompts(p):
     return gr.Button.update(
