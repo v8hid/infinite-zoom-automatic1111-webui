@@ -4,6 +4,7 @@ import base64
 import numpy as np
 import math
 from io import BytesIO
+from modules.processing import apply_overlay, slerp
 
 
 def shrink_and_paste_on_blank(current_image, mask_width, mask_height):
@@ -93,6 +94,28 @@ def lerp(value1, value2, factor):
 def lerp(a, b, t):
     t = np.clip(t, 0, 1)  # clip t to the range [0, 1]
     return ((1 - t) * np.array(a) + t * np.array(b))
+
+def lerpy(img1, img2, alpha):
+    vector = np.vectorize(np.int_)
+    if type(img1) is PIL.Image.Image:
+        img1 = np.array(img1)[:, :, 3]
+    if type(img2) is PIL.Image.Image:
+        img2 = np.array(img2)[:, :, 3]
+    beta = 1.0 - alpha
+    gamma = beta / img1.shape[1]
+    delta = gamma / img1.shape[0]
+    for j in range(img1.shape[0]):
+        for i in range(img1.shape[1]):
+             img1[j][i]=vector(((img1[j][i]*alpha)+(img2[j][i]*beta))+gamma)
+    #cv2.imshow('linear interpolation',img1[:, :, :, None])
+    #cv2.waitKey(0) & 0xFF
+    return Image.fromarray(img1[:, :], mode='L')
+    #return Image.fromarray(img1[:, :], 'RGBA')
+    #return img1[:, :]
+
+def lerp_imagemath(img1, img2, alpha:int = 50):
+    # must use ImageMath.eval to avoid overflow and alpha must be an int from 0 to 100
+    return ImageMath.eval("((im * a) / 100) + (im2 * (100 - a)) / 100", im=img1.convert('L'), im2= img2.convert('L'), a=alpha)
 
 def lerp_color(color1, color2, t):
     """
@@ -654,7 +677,9 @@ def PSLumaWipe_images(start_image: Image, stop_image: Image, luma_wipe_image: Im
     #progress(0, status='Generating luma wipe...')
     # fix transition_color to relative 0.0 - 1.0    
     #luma_color = list(np.divide(transition_color,255))
+    softness = 0.03
     lw_frames = []
+    lw_frames.append(start_image)
     width, height = start_image.size
     #compensate for different image sizes for LumaWipe
     if (start_image.size != luma_wipe_image.size):
@@ -668,9 +693,10 @@ def PSLumaWipe_images(start_image: Image, stop_image: Image, luma_wipe_image: Im
         for x in range(width):
             for y in range(height):
                 # call PSLumaWipe for each pixel
-                pixel = PSLumaWipe(start_image.getpixel((x, y)), stop_image.getpixel((x, y)), luma_wipe_image.getpixel((x, y))[0]/255, transition_color, luma_progress, False, 0.03, 0.01, 0.0)
+                pixel = PSLumaWipe(start_image.getpixel((x, y)), stop_image.getpixel((x, y)), luma_wipe_image.getpixel((x, y))[0]/255, transition_color, luma_progress, False, softness, 0.01, 0.00)
                 transition.putpixel((x, y), pixel)
         lw_frames.append(transition)
         print(f"Luma Wipe frame:{len(lw_frames)}")
         #lw_frames[-1].show()
+    lw_frames.append(stop_image)
     return lw_frames
