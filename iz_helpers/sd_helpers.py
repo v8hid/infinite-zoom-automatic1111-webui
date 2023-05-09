@@ -45,6 +45,7 @@ def renderImg2Img(
     inpainting_fill_mode,
     inpainting_full_res,
     inpainting_padding,
+    mask_invert=False
 ):
     processed = None
 
@@ -67,6 +68,7 @@ def renderImg2Img(
         inpainting_fill=inpainting_fill_mode,
         inpaint_full_res=inpainting_full_res,
         inpaint_full_res_padding=inpainting_padding,
+        inpainting_mask_invert= mask_invert,
         mask=mask_image,
     )
     # p.latent_mask = Image.new("RGB", (p.width, p.height), "white")
