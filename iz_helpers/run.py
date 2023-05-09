@@ -89,7 +89,7 @@ def outpaint_steps(
     mask_height,
     custom_exit_image,
     overmask,
-    frame_correction=True,  # TODO: add frame_Correction in UI
+    frame_correction=False,  # TODO: add frame_Correction in UI
 ):
     main_frames = [init_img.convert("RGB")]
 
@@ -163,6 +163,110 @@ def outpaint_steps(
         # else :TEST
         # current_image.paste(prev_image, mask=prev_image)
     return main_frames, processed
+
+
+def outpaint_steps_cornerStrategy(
+    width,
+    height,
+    common_prompt_pre,
+    common_prompt_suf,
+    prompts,
+    negative_prompt,
+    seed,
+    sampler,
+    num_inference_steps,
+    guidance_scale,
+    inpainting_denoising_strength,
+    inpainting_mask_blur,
+    inpainting_fill_mode,
+    inpainting_full_res,
+    inpainting_padding,
+    init_img,
+    outpaint_steps,
+    out_config,
+    mask_width,
+    mask_height,
+    custom_exit_image,
+    overmask,
+    frame_correction=False,  # TODO: add frame_Correction in UI
+):
+    from PIL import Image, ImageOps, ImageDraw
+    main_frames = [init_img.convert("RGB")]
+
+    currentImage = main_frames[-1]
+
+    # Größe des ursprünglichen Bildes
+    original_width, original_height = currentImage.size
+
+    # Berechne die neue Größe des Bildes
+    new_width = original_width + mask_width
+    new_height = original_height + mask_height
+    left = top = int(mask_width / 2)
+    right = bottom = int(mask_height / 2)
+
+
+    corners = [
+        (0, 0),  # Oben links
+        (new_width - 512, 0),  # Oben rechts
+        (0, new_height - 512),  # Unten links
+        (new_width - 512, new_height - 512),  # Unten rechts
+    ]
+    masked_images = []
+    
+    for idx, corner in enumerate(corners):
+        white = Image.new("1", (new_width,new_height), 1)
+        draw = ImageDraw.Draw(white)
+        draw.rectangle([corner[0], corner[1], corner[0]+512, corner[1]+512], fill=0)
+        masked_images.append(white)
+
+   
+    for i in range(outpaint_steps):
+        print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(seed)}")
+        currentImage = main_frames[-1]
+
+        if custom_exit_image and ((i + 1) == outpaint_steps):
+            currentImage = custom_exit_image.resize(
+                (width, height), resample=Image.LANCZOS
+            )
+            main_frames.append(currentImage.convert("RGB"))
+            # print("using Custom Exit Image")
+            save2Collect(currentImage, out_config, f"exit_img.png")
+        else:
+            expanded_image = ImageOps.expand(currentImage, (left, top, right, bottom), fill=(0, 0, 0))
+            pr = prompts[max(k for k in prompts.keys() if k <= i)]
+            
+            # outpaint 4 corners loop
+            for idx,cornermask in enumerate(masked_images):
+                processed, newseed = renderImg2Img(
+                    f"{common_prompt_pre}\n{pr}\n{common_prompt_suf}".strip(),
+                    negative_prompt,
+                    sampler,
+                    num_inference_steps,
+                    guidance_scale,
+                    seed,
+                    512,  #outpaintsizeW
+                    512,  #outpaintsizeH
+                    expanded_image,
+                    cornermask,
+                    1, #inpainting_denoising_strength,
+                    0, # inpainting_mask_blur,
+                    2, ## noise? fillmode
+                    False,  # only masked, not full, keep size of expandedimage!
+                    0 #inpainting_padding,
+                )
+                expanded_image = processed.images[0]
+            #
+            
+            if len(processed.images) > 0:
+                main_frames.append(expanded_image.resize((width,height)).convert("RGB"))
+                processed.images[0]=main_frames[-1]
+                save2Collect(processed.images[0], out_config, f"outpaint_step_{i}.png")
+            seed = newseed
+            # TODO: seed behavior
+
+
+    return main_frames, processed
+
 
 
 def create_zoom(
@@ -385,7 +489,7 @@ def create_zoom_single(
     load_model_from_setting(
         "infzoom_inpainting_model", progress, "Loading Model for inpainting/img2img: "
     )
-    main_frames, processed = outpaint_steps(
+    main_frames, processed = outpaint_steps_cornerStrategy(
         width,
         height,
         common_prompt_pre,
@@ -425,7 +529,7 @@ def create_zoom_single(
 
     contVW = ContinuousVideoWriter(out_config["video_filename"], main_frames[0],video_frame_rate,int(video_start_frame_dupe_amount))
     
-    interpolateFrames(out_config, width, height, mask_width, mask_height, num_interpol_frames, contVW, main_frames, video_zoom_mode)
+    interpolateFrames(out_config, width, height, mask_width*2, mask_height*2, num_interpol_frames, contVW, main_frames, video_zoom_mode)
 
     contVW.finish(main_frames[-1],int(video_last_frame_dupe_amount))
 
