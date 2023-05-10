@@ -201,9 +201,8 @@ def outpaint_steps_cornerStrategy(
     # Berechne die neue Größe des Bildes
     new_width = original_width + mask_width
     new_height = original_height + mask_height
-    left = top = int(mask_width / 2)
-    right = bottom = int(mask_height / 2)
-
+    left = top = int(mask_width/2)
+    right = bottom = int(mask_height/2)
 
     corners = [
         (0, 0),  # Oben links
@@ -251,14 +250,15 @@ def outpaint_steps_cornerStrategy(
                     1, #inpainting_denoising_strength,
                     0, # inpainting_mask_blur,
                     2, ## noise? fillmode
-                    False,  # only masked, not full, keep size of expandedimage!
+                    True,  # only masked, not full, keep size of expandedimage!
                     0 #inpainting_padding,
                 )
                 expanded_image = processed.images[0]
             #
             
             if len(processed.images) > 0:
-                main_frames.append(expanded_image.resize((width,height)).convert("RGB"))
+                zoomed_img = expanded_image.resize((width,height), Image.Resampling.LANCZOS)
+                main_frames.append(zoomed_img)
                 processed.images[0]=main_frames[-1]
                 save2Collect(processed.images[0], out_config, f"outpaint_step_{i}.png")
             seed = newseed
@@ -529,7 +529,7 @@ def create_zoom_single(
 
     contVW = ContinuousVideoWriter(out_config["video_filename"], main_frames[0],video_frame_rate,int(video_start_frame_dupe_amount))
     
-    interpolateFrames(out_config, width, height, mask_width*2, mask_height*2, num_interpol_frames, contVW, main_frames, video_zoom_mode)
+    interpolateFrames(out_config, width, height, mask_width, mask_height, num_interpol_frames, contVW, main_frames, video_zoom_mode)
 
     contVW.finish(main_frames[-1],int(video_last_frame_dupe_amount))
 
@@ -607,7 +607,7 @@ def interpolateFrames(out_config, width, height, mask_width, mask_height, num_in
                 main_frames[i], interpol_width2, interpol_height2
             )
 
-            interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
+            #interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
             save2Collect(interpol_image, out_config, f"interpol_prevcrop_{i}_{j}.png")
 
             contVW.append([interpol_image])
