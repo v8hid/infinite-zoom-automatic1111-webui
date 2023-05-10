@@ -53,6 +53,8 @@ class InfZoomer:
     def __init__(self, config: InfZoomConfig) -> None:
         self.C = config
         self.prompts = {}
+        self.main_frames = []
+        self.out_config = {}
 
         for x in self.C.prompts_array:
             try:
@@ -67,6 +69,12 @@ class InfZoomer:
         fix_env_Path_ffprobe()
         self.out_config = self.prepare_output_path()
 
+        self.width = closest_upper_divisible_by_eight(self.C.outputsizeW)
+        self.height = closest_upper_divisible_by_eight(self.C.outputsizeH)
+
+        self.current_seed = self.C.seed
+
+    # object properties, different from user input config
     out_config = {}
     prompts = {}
     main_frames:Image = []
@@ -89,11 +97,6 @@ class InfZoomer:
         #         progress(0, desc="Preparing Initial Image")
         # except Exception:
         #     pass
-
-        self.width = closest_upper_divisible_by_eight(self.C.outputsizeW)
-        self.height = closest_upper_divisible_by_eight(self.C.outputsizeH)
-
-        self.current_seed = self.C.seed
 
         if self.C.custom_init_image:
             current_image = Image.new(mode="RGBA", size=(self.width, self.height))
@@ -396,7 +399,7 @@ def createZoom(
     inpainting_padding:int=0,
     progress:any=None
 ):
-    iz = InfZoomConfig(
+    izc = InfZoomConfig(
         common_prompt_pre,
         prompts_array,
         common_prompt_suf,
@@ -427,4 +430,7 @@ def createZoom(
         inpainting_padding,
         progress
     )
-    return InfZoomer(iz).create_zoom()
+    iz= InfZoomer(izc)
+    r = iz.create_zoom()
+    del iz
+    return r
