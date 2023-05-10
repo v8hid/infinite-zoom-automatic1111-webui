@@ -196,7 +196,7 @@ class InfZoomer:
             draw.rectangle([corner[0], corner[1], corner[0]+512, corner[1]+512], fill=0)
             masked_images.append(white)
 
-        outpaint_steps=len(self.prompts) 
+        outpaint_steps=self.C.num_outpainting_steps
         for i in range(outpaint_steps):
             print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(self.current_seed)}")
             currentImage = self.main_frames[-1]
