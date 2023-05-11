@@ -572,7 +572,7 @@ def create_zoom_single(
         int(video_last_frame_dupe_amount),
         num_interpol_frames,
         True,
-         open_image("G:\\Projects\\obs-studio\\plugins\\obs-transitions\\data\\luma_wipes\\derez-top.png")
+        open_image("G:\\Projects\\obs-studio\\plugins\\obs-transitions\\data\\luma_wipes\\derez-top.png")
     )
     print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
     return (

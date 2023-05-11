@@ -1,6 +1,6 @@
 import numpy as np
 import imageio
-from .image import blend_images, draw_gradient_ellipse, alpha_composite_images, luma_wipe_images, PSLumaWipe_images
+from .image import blend_images, draw_gradient_ellipse, alpha_composite_images, luma_wipe_images, PSLumaWipe_images2
 import math
 
 def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30, num_interpol_frames=2, blend=False, blend_image= None):
@@ -28,35 +28,35 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
         next_frame = frames[num_frames_replaced]
         next_to_last_frame = frames[(-1 * num_frames_replaced)]
         
-        print(f"Blending start: {math.ceil(start_frame_dupe_amount)} next frame:{(num_interpol_frames -1)}")
+        print(f"Blending start: {math.ceil(start_frame_dupe_amount)} next frame:{(num_frames_replaced)}")
         #start_frames = alpha_composite_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
         #start_frames = luma_wipe_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
-        start_frames = PSLumaWipe_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount),(200,200,0,128))
+        start_frames = PSLumaWipe_images2(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount),(255,255,0,225))
         del frames[:num_frames_replaced]
 
-        print(f"Blending end: {math.ceil(last_frame_dupe_amount)} next to last frame:{-1 * (num_interpol_frames + 1)}")
-        #end_frames = alpha_composite_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
+        print(f"Blending end: {math.ceil(last_frame_dupe_amount)} next to last frame:{-1 * (num_frames_replaced)}")
+        end_frames = alpha_composite_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
         #end_frames = luma_wipe_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
-        end_frames = PSLumaWipe_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount),(200,200,0,128))
+        #end_frames = PSLumaWipe_images2(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount),(255,255,0,225))
         frames = frames[:(-1 * num_frames_replaced)]
     else:
         start_frames = [frames[0]] * start_frame_dupe_amount
         end_frames = [frames[-1]] * last_frame_dupe_amount    
 
-    # Write the duplicated frames to the video writer
+    # Write the blended start frames to the video writer
     for frame in start_frames:
         # Convert PIL image to numpy array
-        np_frame = np.array(frame)
+        np_frame = np.array(frame.convert("RGB"))
         writer.append_data(np_frame)
 
     # Write the frames to the video writer
     for frame in frames:
-        np_frame = np.array(frame)
+        np_frame = np.array(frame.convert("RGB"))
         writer.append_data(np_frame)
 
-    # Write the duplicated frames to the video writer
+    # Write the blended end frames to the video writer
     for frame in end_frames:
-        np_frame = np.array(frame)
+        np_frame = np.array(frame.convert("RGB"))
         writer.append_data(np_frame)
 
     # Close the video writer
