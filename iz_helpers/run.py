@@ -44,6 +44,7 @@ class InfZoomConfig():
     upscaler_name:str
     upscale_by:float
     overmask:int
+    outpaintStrategy: str
     inpainting_denoising_strength:float=1
     inpainting_full_res:int =0
     inpainting_padding:int=0
@@ -118,8 +119,8 @@ class InfZoomer:
                 self.save2Collect(current_image, f"init_txt2img.png")
             self.current_seed = newseed
 
-        self.mask_width = math.trunc(self.width / 4)  # was initially 512px => 128px
-        self.mask_height = math.trunc(self.height / 4)  # was initially 512px => 128px
+        self.mask_width  = math.trunc(self.width  * 1/10 )  # was initially 512px => 128px
+        self.mask_height = math.trunc(self.height * 1/10 )  # was initially 512px => 128px
 
         self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed)
 
@@ -127,7 +128,13 @@ class InfZoomer:
             "infzoom_inpainting_model", self.C.progress, "Loading Model for inpainting/img2img: "
         )
         self.main_frames.append(current_image) # init or first txt2img
-        self.main_frames, processed = self.outpaint_steps_cornerStrategy()
+
+        if (self.C.outpaintStrategy == "Corners"):
+            self.main_frames, processed = self.outpaint_steps_cornerStrategy()
+        elif (self.C.outpaintStrategy == "Center"):
+            self.main_frames, processed = self.outpaint_steps_smallCenter()
+        else:
+            raise ValueError("Unsupported outpaint strategy in Infinity Zoom")
         
         if (self.C.upscale_do):
             for idx,mf in enumerate(self.main_frames):
@@ -136,8 +143,8 @@ class InfZoomer:
 
             self.width  = self.main_frames[0].width
             self.height = self.main_frames[0].height
-            self.mask_width = self.width/4
-            self.mask_height = self.height/4
+            self.mask_width = math.trunc((self.width * 1/10) *(self.C.upscale_by))
+            self.mask_height = math.trunc((self.height *1/10) * (self.C.upscale_by))
 
         if self.C.video_zoom_mode:
             self.main_frames = self.main_frames[::-1]
@@ -246,6 +253,64 @@ class InfZoomer:
                 # TODO: seed behavior
 
         return self.main_frames, processed
+    
+
+    def outpaint_steps_smallCenter(self):
+
+        #empty_image = Image.new(mode="L", size=(self.width,self.height),color=0)
+        #masked_image = self.main_frames[-1].resize((self.width-2*self.mask_width,self.height-2*self.mask_height))
+
+        # one mask for all steps and outpaints
+        mask_image = np.array(shrink_and_paste_on_blank(
+            self.main_frames[0], self.mask_width+self.C.overmask, self.mask_height+self.C.overmask)
+        )[:, :, 3]
+        mask_image = Image.fromarray(255 - mask_image).convert("RGB")
+
+#       if (self.C.inpainting_fill_mode == 1): # ORIGINAL
+
+        outpaint_steps=self.C.num_outpainting_steps
+
+        for i in range(outpaint_steps):
+            print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(self.current_seed)}")
+            currentImage = self.main_frames[-1]
+
+            if self.C.custom_exit_image and ((i + 1) == outpaint_steps):
+                currentImage = self.C.custom_exit_image.resize(
+                    (self.C.width, self.C.height), resample=Image.LANCZOS
+                )
+                self.main_frames.append(currentImage.convert("RGB"))
+                # print("using Custom Exit Image")
+                self.save2Collect(currentImage, self.out_config, f"exit_img.png")
+            else:
+                smaller_image = shrink_and_paste_on_blank(currentImage,self.mask_width,self.mask_height)
+                pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
+                
+                processed, newseed = renderImg2Img(
+                    f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
+                    self.C.negative_prompt,
+                    self.C.sampler,
+                    self.C.num_inference_steps,
+                    self.C.guidance_scale,
+                    self.current_seed,
+                    512,  #outpaintsizeW
+                    512,  #outpaintsizeH
+                    smaller_image,
+                    mask_image,
+                    1, #inpainting_denoising_strength,
+                    self.C.inpainting_mask_blur,
+                    self.C.inpainting_fill_mode,
+                    True,  # only masked, not full, keep size of expandedimage!
+                    0 #inpainting_padding,
+                )
+                
+                if len(processed.images) > 0:
+                    self.main_frames.append(processed.images[0])
+                    self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
+                seed = newseed
+                # TODO: seed behavior
+
+        return self.main_frames, processed
+
 
     def interpolateFrames(self):
         for i in range(len(self.main_frames) - 1):
@@ -394,6 +459,7 @@ def createZoom(
     upscaler_name:str,
     upscale_by:float,
     overmask:int,
+    outpaintStrategy:str,
     inpainting_denoising_strength:float=1,
     inpainting_full_res:int =0,
     inpainting_padding:int=0,
@@ -425,6 +491,7 @@ def createZoom(
         upscaler_name,
         upscale_by,
         overmask,
+        outpaintStrategy,
         inpainting_denoising_strength,
         inpainting_full_res,
         inpainting_padding,

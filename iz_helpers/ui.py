@@ -238,6 +238,13 @@ def on_ui_tabs():
                         type="index",
                     )
 
+                    outpaintStrategy= gr.Radio(
+                        label="Outpaint Strategy",
+                        choices=["Center", "Corners"],
+                        value="Corners",
+                        type="value" 
+                    )
+
                 with gr.Tab("Post proccess"):
                     upscale_do = gr.Checkbox(False, label="Enable Upscale")
                     upscaler_name = gr.Dropdown(
@@ -299,7 +306,8 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 upscale_do,
                 upscaler_name,
                 upscale_by,
-                overmask
+                overmask,
+                outpaintStrategy
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
