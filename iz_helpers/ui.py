@@ -1,5 +1,5 @@
 import gradio as gr
-from .run import createZoom
+from .run_interface import createZoom
 import modules.shared as shared
 from webui import wrap_gradio_gpu_call
 from modules.ui import create_output_panel
