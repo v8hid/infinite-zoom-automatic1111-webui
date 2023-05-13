@@ -43,8 +43,8 @@ class InfZoomer:
 
         self.current_seed = self.C.seed
 
-        self.mask_width  = self.width  * 1//4   # was initially 512px => 128px
-        self.mask_height = self.height * 1//4   # was initially 512px => 128px
+        self.mask_width  = self.width  * 1//16   # was initially 512px => 128px
+        self.mask_height = self.height * 1//16   # was initially 512px => 128px
         self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed)
 
         if (self.C.outpaintStrategy == "Corners"):
@@ -441,7 +441,7 @@ class InfZoomer:
             scaling_steps.append((math.floor(new_width), math.floor(new_height)))
         return scaling_steps
    
-    def interpolateFramesOuterZoom(cls,self):
+    def interpolateFramesOuterZoom(self):
 
         if 0 == self.C.video_zoom_mode:
             current_image = self.main_frames[0]
@@ -451,7 +451,7 @@ class InfZoomer:
             raise ValueError("unsupported Zoom mode in INfZoom")
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
-                                            cls.cropCenterTo(current_image,(self.width,self.height)),
+                                            self.cropCenterTo(current_image,(self.width,self.height)),
                                             self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
 
         outzoomSize = (self.width+self.mask_width*2, self.height+self.mask_height*2)
@@ -471,7 +471,7 @@ class InfZoomer:
                 current_image = self.main_frames[-1-i]
 
             self.contVW.append([
-                cls.cropCenterTo(current_image,(self.width, self.height))
+                self.cropCenterTo(current_image,(self.width, self.height))
             ])
 
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
@@ -480,7 +480,7 @@ class InfZoomer:
                 print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
                 #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
                 scaled_image = current_image.resize(scaling_steps[j])                    
-                cropped_image = cls.cropCenterTo(scaled_image,(self.width, self.height))
+                cropped_image = self.cropCenterTo(scaled_image,(self.width, self.height))
 
                 self.contVW.append([cropped_image])
 
@@ -614,8 +614,7 @@ class InfZoomer:
 
         return prev_step_img
 
-    @staticmethod
-    def cropCenterTo(im: Image, toSize: tuple[int,int]):
+    def cropCenterTo(self, im: Image, toSize: tuple[int,int]):
         width, height = im.size
         left = (width - toSize[0])//2
         top = (height - toSize[1])//2
