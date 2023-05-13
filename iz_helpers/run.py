@@ -52,7 +52,7 @@ class InfZoomer:
             self.fnInterpolateFrames = self.interpolateFramesOutIn
         elif (self.C.outpaintStrategy == "Center"):
            self.fnOutpaintMainFrames = self.outpaint_steps_v8hid
-           self.fnInterpolateFrames = self.interpolateFrames
+           self.fnInterpolateFrames = self.interpolateFramesSmallCenter
         else:
             raise ValueError("Unsupported outpaint strategy in Infinite Zoom")
 
@@ -114,8 +114,8 @@ class InfZoomer:
 
         self.width  = self.main_frames[0].width
         self.height = self.main_frames[0].height
-        self.mask_width = math.trunc((self.width * 1/4) *(self.C.upscale_by))
-        self.mask_height = math.trunc((self.height *1/4) * (self.C.upscale_by))
+        self.mask_width = math.trunc(self.mask_width*self.C.upscale_by)
+        self.mask_height = math.trunc(self.mask_height *self.C.upscale_by)
 
     def prepareInitImage(self) -> Image:
         if self.C.custom_init_image:
@@ -427,31 +427,7 @@ class InfZoomer:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def interpolateFrames(self):
+    def interpolateFramesSmallCenter(self):
         for i in range(len(self.main_frames) - 1):
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
             for j in range(self.num_interpol_frames - 1):
