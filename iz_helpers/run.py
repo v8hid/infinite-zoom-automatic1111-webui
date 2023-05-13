@@ -1,5 +1,6 @@
 import math, time, os
 import numpy as np
+from typing import Callable, Any
 from PIL import Image, ImageFilter, ImageOps, ImageDraw
 
 from modules.ui import plaintext_to_html
@@ -42,15 +43,33 @@ class InfZoomer:
 
         self.current_seed = self.C.seed
 
+        self.mask_width  = self.width  * 1//4   # was initially 512px => 128px
+        self.mask_height = self.height * 1//4   # was initially 512px => 128px
+        self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed)
+
+        if (self.C.outpaintStrategy == "Corners"):
+            self.fnOutpaintMainFrames = self.outpaint_steps_cornerStrategy
+            self.fnInterpolateFrames = self.interpolateFramesOutIn
+        elif (self.C.outpaintStrategy == "Center"):
+           self.fnOutpaintMainFrames = self.outpaint_steps_v8hid
+           self.fnInterpolateFrames = self.interpolateFrames
+        else:
+            raise ValueError("Unsupported outpaint strategy in Infinite Zoom")
+
+        outerZoom = True    # scale from overscan to target viewport
+
     # object properties, different from user input config
     out_config = {}
     prompts = {}
     main_frames:Image = []
 
+    outerZoom: bool
     mask_width: int
     mask_height: int
     current_seed: int
     contVW: ContinuousVideoWriter
+    fnOutpaintMainFrames: Callable
+    fnInterpolateFrames: Callable
 
     def create_zoom(self):
         for i in range(self.C.batchcount):
@@ -59,66 +78,22 @@ class InfZoomer:
         return result
 
     def create_zoom_single(self):
-        # try:
-        #     if gr.Progress() is not None:
-        #         progress = gr.Progress()
-        #         progress(0, desc="Preparing Initial Image")
-        # except Exception:
-        #     pass
 
-        if self.C.custom_init_image:
-            current_image = Image.new(mode="RGBA", size=(self.width, self.height))
-            current_image = current_image.convert("RGB")
-            current_image = self.C.custom_init_image.resize(
-                (self.width, self.height), resample=Image.LANCZOS
-            )
-            self.save2Collect(current_image, f"init_custom.png")
+        self.main_frames.append(self.prepareInitImage())
 
-        else:
-            load_model_from_setting(
-                "infzoom_txt2img_model", self.C.progress, "Loading Model for txt2img: "
-            )
+        load_model_from_setting("infzoom_inpainting_model", self.C.progress, "Loading Model for inpainting/img2img: ")
 
-            processed, newseed = self.renderFirstFrame()
+        processed = self.fnOutpaintMainFrames()
 
-            if len(processed.images) > 0:
-                current_image = processed.images[0]
-                self.save2Collect(current_image, f"init_txt2img.png")
-            self.current_seed = newseed
-
-        self.mask_width  = self.width  * 1//4   # was initially 512px => 128px
-        self.mask_height = self.height * 1//4   # was initially 512px => 128px
-
-        self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed)
-
-        load_model_from_setting(
-            "infzoom_inpainting_model", self.C.progress, "Loading Model for inpainting/img2img: "
-        )
-        self.main_frames.append(current_image) # init or first txt2img
-
-        if (self.C.outpaintStrategy == "Corners"):
-            self.main_frames, processed = self.outpaint_steps_cornerStrategy()
-        elif (self.C.outpaintStrategy == "Center"):
-            self.main_frames, processed = self.outpaint_steps_smallCenter()
-        else:
-            raise ValueError("Unsupported outpaint strategy in Infinity Zoom")
-        
-        if (self.C.upscale_do):
-            for idx,mf in enumerate(self.main_frames):
-                print (f"\033[KInfZoom: Upscaling mainframe: {idx}   \r")
-                self.main_frames[idx]=do_upscaleImg(mf, self.C.upscale_do, self.C.upscaler_name, self.C.upscale_by)
-
-            self.width  = self.main_frames[0].width
-            self.height = self.main_frames[0].height
-            self.mask_width = math.trunc((self.width * 1/4) *(self.C.upscale_by))
-            self.mask_height = math.trunc((self.height *1/4) * (self.C.upscale_by))
+        if (self.C.upscale_do): 
+            self.doUpscaling()
 
         if self.C.video_zoom_mode:
             self.main_frames = self.main_frames[::-1]
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], self.main_frames[0],self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
         
-        self.interpolateFrames()
+        self.fnInterpolateFrames() # changes main_frame and writes to video
 
         self.contVW.finish(self.main_frames[-1],int(self.C.video_last_frame_dupe_amount))
 
@@ -132,6 +107,35 @@ class InfZoomer:
             plaintext_to_html(""),
         )
 
+    def doUpscaling(self):
+        for idx,mf in enumerate(self.main_frames):
+            print (f"\033[KInfZoom: Upscaling mainframe: {idx}   \r")
+            self.main_frames[idx]=do_upscaleImg(mf, self.C.upscale_do, self.C.upscaler_name, self.C.upscale_by)
+
+        self.width  = self.main_frames[0].width
+        self.height = self.main_frames[0].height
+        self.mask_width = math.trunc((self.width * 1/4) *(self.C.upscale_by))
+        self.mask_height = math.trunc((self.height *1/4) * (self.C.upscale_by))
+
+    def prepareInitImage(self) -> Image:
+        if self.C.custom_init_image:
+            current_image = Image.new(mode="RGBA", size=(self.width, self.height))
+            current_image = current_image.convert("RGB")
+            current_image = self.C.custom_init_image.resize(
+                (self.width, self.height), resample=Image.LANCZOS
+            )
+            self.save2Collect(current_image, f"init_custom.png")
+        else:
+            load_model_from_setting("infzoom_txt2img_model", self.C.progress, "Loading Model for txt2img: ")
+
+            processed, newseed = self.renderFirstFrame()
+
+            if len(processed.images) > 0:
+                current_image = processed.images[0]
+                self.save2Collect(current_image, f"init_txt2img.png")
+            self.current_seed = newseed
+        return current_image
+
     def renderFirstFrame(self):
         pr = self.getInitialPrompt()
 
@@ -144,7 +148,7 @@ class InfZoomer:
                 self.current_seed,
                 self.width,
                 self.height
-            )
+        )
 
     def getInitialPrompt(self):
         return self.prompts[min(k for k in self.prompts.keys() if k >= 0)]
@@ -219,13 +223,59 @@ class InfZoomer:
                 seed = newseed
                 # TODO: seed behavior
 
-        return self.main_frames, processed
+        return processed
     
 
-    def outpaint_steps_smallCenter(self):
+    def outpaint_steps_v8hid(self):
 
-        #empty_image = Image.new(mode="L", size=(self.width,self.height),color=0)
-        #masked_image = self.main_frames[-1].resize((self.width-2*self.mask_width,self.height-2*self.mask_height))
+        for i in range(self.C.num_outpainting_steps):
+            print (f"Outpaint step: {str(i + 1)} / {str(self.C.num_outpainting_steps)} Seed: {str(self.current_seed)}")
+        
+            current_image = self.main_frames[-1]
+            current_image = shrink_and_paste_on_blank(
+                current_image, self.mask_width, self.mask_height
+            )
+
+            mask_image = np.array(current_image)[:, :, 3]
+            mask_image = Image.fromarray(255 - mask_image).convert("RGB")
+
+            if self.C.custom_exit_image and ((i + 1) == self.C.num_outpainting_steps):
+                current_image = self.C.custom_exit_image.resize(
+                    (self.width, self.height), resample=Image.LANCZOS
+                )
+                self.main_frames.append(current_image.convert("RGB"))
+                # print("using Custom Exit Image")
+                self.save2Collect(current_image, f"exit_img.png")
+            else:
+                pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
+                processed, newseed = renderImg2Img(
+                    f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
+                    self.C.negative_prompt,
+                    self.C.sampler,
+                    self.C.num_inference_steps,
+                    self.C.guidance_scale,
+                    self.current_seed,
+                    self.width,
+                    self.height,
+                    current_image,
+                    mask_image,
+                    self.C.inpainting_denoising_strength,
+                    self.C.inpainting_mask_blur,
+                    self.C.inpainting_fill_mode,
+                    self.C.inpainting_full_res,
+                    self.C.inpainting_padding,
+                )
+
+                if len(processed.images) > 0:
+                    self.main_frames.append(processed.images[0].convert("RGB"))
+                    self.save2Collect(processed.images[0], f"outpain_step_{i}.png")
+                seed = newseed
+                # TODO: seed behavior
+
+        return processed
+
+
+    def outpaint_steps_smallCenter(self):
 
         # one mask for all steps and outpaints
         mask_image = np.array(shrink_and_paste_on_blank(
@@ -276,7 +326,129 @@ class InfZoomer:
                 seed = newseed
                 # TODO: seed behavior
 
-        return self.main_frames, processed
+        return processed
+
+
+    def interpolateFramesOutIn(self):
+        for i in range(len(self.main_frames) - 1):
+            # interpolation steps between 2 inpainted images (=sequential zoom and crop)
+            for j in range(self.num_interpol_frames - 1):
+
+                print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
+                #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
+                if self.C.video_zoom_mode:
+                    current_image = self.main_frames[i + 1]
+                else:
+                    current_image = self.main_frames[i + 1]
+                    
+                interpol_image = current_image
+                self.save2Collect(interpol_image, f"interpol_img_{i}_{j}].png")
+
+                interpol_width = math.ceil(
+                    ( 1 - (1 - 2 * self.mask_width / self.width) **(1 - (j + 1) / self.num_interpol_frames) ) 
+                    * self.width / 2
+                )
+
+                interpol_height = math.ceil(
+                    ( 1 - (1 - 2 * self.mask_height / self.height) ** (1 - (j + 1) / self.num_interpol_frames) )
+                    * self.height/2
+                )
+
+                interpol_image = interpol_image.crop(
+                    (
+                        interpol_width,
+                        interpol_height,
+                        self.width - interpol_width,
+                        self.height - interpol_height,
+                    )
+                )
+
+                interpol_image = interpol_image.resize((self.width, self.height))
+                self.save2Collect(interpol_image, f"interpol_resize_{i}_{j}.png")
+
+                # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
+                interpol_width2 = math.ceil(
+                    (1 - (self.width - 2 * self.mask_width) / (self.width - 2 * interpol_width))
+                    / 2 * self.width
+                )
+
+                interpol_height2 = math.ceil(
+                    (1 - (self.height - 2 * self.mask_height) / (self.height - 2 * interpol_height))
+                    / 2 * self.height
+                )
+
+                prev_image_fix_crop = shrink_and_paste_on_blank(
+                    self.main_frames[i], interpol_width2, interpol_height2
+                )
+
+                interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
+                self.save2Collect(interpol_image, f"interpol_prevcrop_{i}_{j}.png")
+
+                self.contVW.append([interpol_image])
+
+            self.contVW.append([current_image])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def interpolateFrames(self):
