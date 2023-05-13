@@ -94,7 +94,7 @@ class InfZoomer:
         if not self.outerZoom:
             self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], self.main_frames[0],self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
         
-        self.fnInterpolateFrames(self) # changes main_frame and writes to video
+        self.fnInterpolateFrames() # changes main_frame and writes to video
 
         self.contVW.finish(self.main_frames[-1],int(self.C.video_last_frame_dupe_amount))
 
@@ -173,9 +173,10 @@ class InfZoomer:
         masked_images = []
         
         for idx, corner in enumerate(corners):
-            white = Image.new("1", (new_width,new_height), 1)
+            white = Image.new("1", (new_width,new_height), 0)
             draw = ImageDraw.Draw(white)
-            draw.rectangle([corner[0], corner[1], corner[0]+512, corner[1]+512], fill=0)
+            draw.rectangle([corner[0], corner[1], corner[0]+512, corner[1]+512], fill=1) #area of full inpaint
+            draw.rectangle([left, top, left-1+original_width, top-1+original_height], fill=0) #preserve inner org img
             masked_images.append(white)
 
         outpaint_steps=self.C.num_outpainting_steps
@@ -188,7 +189,7 @@ class InfZoomer:
                     (self.C.width, self.C.height), resample=Image.LANCZOS
                 )
                 
-                if not self.outerZoom:
+                if 0 == self.outerZoom:
                     self.main_frames.append(currentImage.convert("RGB"))
 
                 self.save2Collect(currentImage, self.out_config, f"exit_img.png")
@@ -234,6 +235,11 @@ class InfZoomer:
                         self.main_frames.append(zoomed_img)
                         processed.images[0]=self.main_frames[-1]
                         self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
+
+
+
+        # debug:
+        for i in masked_images: processed.images.append(i)
 
         return processed
     
@@ -340,20 +346,100 @@ class InfZoomer:
         return processed
 
 
-    def calculate_interpolation_steps(self, original_size, target_size, steps):
+    def calculate_interpolation_steps_linear(self, original_size, target_size, steps):
         width, height = original_size
         target_width, target_height = target_size
 
         if width <= 0 or height <= 0 or target_width <= 0 or target_height <= 0 or steps <= 0:
             return None
 
-        width_step = math.floor((width - target_width) / steps)
-        height_step = math.floor((height - target_height) / steps)
+        width_step = (width - target_width) / steps
+        height_step = (height - target_height) / steps
 
-        scaling_steps = [(width - i * width_step, height - i * height_step) for i in range(1,steps)]
+        scaling_steps = [(round(width - i * width_step), round(height - i * height_step)) for i in range(1,steps)]
 
         return scaling_steps
 
+
+    def calculate_interpolation_steps_goldenratio(self,original_size, target_size, steps):
+        width, height = original_size
+        target_width, target_height = target_size
+        golden_ratio = (1 + 5 ** 0.5) / 2 - 1  # Approx. 0.618
+
+        if width <= 0 or height <= 0 or target_width <= 0 or target_height <= 0 or steps <= 0:
+            return None
+
+        original_ratio = width / height
+        scaling_steps = []
+        for i in range(1, steps + 1):
+            t = i / steps
+            factor = 1 - golden_ratio * t
+            new_width = width * factor + target_width * (1 - factor)
+            new_height = height * factor + target_height * (1 - factor)
+
+            floor_width, ceil_width = int(new_width // 1), int(new_width // 1 + 1)
+            floor_height, ceil_height = int(new_height // 1), int(new_height // 1 + 1)
+
+            floor_ratio = floor_width / floor_height
+            ceil_ratio = ceil_width / ceil_height
+
+            if abs(floor_ratio - original_ratio) < abs(ceil_ratio - original_ratio):
+                new_width, new_height = floor_width, floor_height
+            else:
+                new_width, new_height = ceil_width, ceil_height
+
+            scaling_steps.append((new_width, new_height))
+
+        return scaling_steps
+
+
+    def calculate_interpolation_steps_log(self, original_size, target_size, steps):
+        width, height = original_size
+        target_width, target_height = target_size
+
+        if width <= 0 or height <= 0 or target_width <= 0 or target_height <= 0 or steps <= 0:
+            return None
+
+        original_ratio = width / height
+        scaling_steps = []
+        
+        log_w_ratio = math.log(target_width / width) / steps
+        log_h_ratio = math.log(target_height / height) / steps
+
+        for i in range(1, steps):
+            new_width = width * math.exp(i * log_w_ratio)
+            new_height = height * math.exp(i * log_h_ratio)
+
+            floor_width, ceil_width = int(new_width // 1), int(new_width // 1 + 1)
+            floor_height, ceil_height = int(new_height // 1), int(new_height // 1 + 1)
+
+            floor_ratio = floor_width / floor_height
+            ceil_ratio = ceil_width / ceil_height
+
+            if abs(floor_ratio - original_ratio) < abs(ceil_ratio - original_ratio):
+                new_width, new_height = floor_width, floor_height
+            else:
+                new_width, new_height = ceil_width, ceil_height
+
+            scaling_steps.append((new_width, new_height))
+
+        # Add the last step that is one pixel away from the target size
+        scaling_steps.append((target_width - 1, target_height - 1))
+
+        return scaling_steps
+
+
+    def calculate_interpolation_steps_exponential(self, original_size, target_size, steps,exponent=2):
+        width, height = original_size
+        target_width, target_height = target_size
+        scaling_steps = []
+        for i in range(1, steps + 1):
+            t = i / steps
+            factor = (1 - t) + t * (math.pow(t, exponent - 1))
+            new_width = width * (1 - factor) + target_width * factor
+            new_height = height * (1 - factor) + target_height * factor
+            scaling_steps.append((math.floor(new_width), math.floor(new_height)))
+        return scaling_steps
    
     def interpolateFramesOuterZoom(cls,self):
 
@@ -370,7 +456,9 @@ class InfZoomer:
 
         outzoomSize = (self.width+self.mask_width*2, self.height+self.mask_height*2)
         target_size = (self.width, self.height)
-        scaling_steps = self.calculate_interpolation_steps(outzoomSize, target_size, self.num_interpol_frames)
+
+
+        scaling_steps = self.calculate_interpolation_steps_linear(outzoomSize, target_size, self.num_interpol_frames)
 
         print(f"{scaling_steps}, length: {len(scaling_steps)}")
         for x,y in scaling_steps:
@@ -398,6 +486,16 @@ class InfZoomer:
 
 
     def interpolateFramesSmallCenter(self):
+
+        if self.C.video_zoom_mode:
+            firstImage = self.main_frames[0]
+        else:
+            firstImage = self.main_frames[-1]
+
+        self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
+                                (firstImage,(self.width,self.height)),
+                                self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
+
         for i in range(len(self.main_frames) - 1):
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
             for j in range(self.num_interpol_frames - 1):
@@ -408,7 +506,8 @@ class InfZoomer:
                     current_image = self.main_frames[i + 1]
                 else:
                     current_image = self.main_frames[i + 1]
-                    
+
+
                 interpol_image = current_image
                 self.save2Collect(interpol_image, f"interpol_img_{i}_{j}].png")
 
