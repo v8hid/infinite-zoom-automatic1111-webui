@@ -49,14 +49,14 @@ class InfZoomer:
 
         if (self.C.outpaintStrategy == "Corners"):
             self.fnOutpaintMainFrames = self.outpaint_steps_cornerStrategy
-            self.fnInterpolateFrames = self.interpolateFramesOutIn
+            self.fnInterpolateFrames = self.interpolateFramesOuterZoom
         elif (self.C.outpaintStrategy == "Center"):
            self.fnOutpaintMainFrames = self.outpaint_steps_v8hid
            self.fnInterpolateFrames = self.interpolateFramesSmallCenter
         else:
             raise ValueError("Unsupported outpaint strategy in Infinite Zoom")
 
-        outerZoom = True    # scale from overscan to target viewport
+        self.outerZoom = True    # scale from overscan to target viewport
 
     # object properties, different from user input config
     out_config = {}
@@ -91,9 +91,10 @@ class InfZoomer:
         if self.C.video_zoom_mode:
             self.main_frames = self.main_frames[::-1]
 
-        self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], self.main_frames[0],self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
+        if not self.outerZoom:
+            self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], self.main_frames[0],self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
         
-        self.fnInterpolateFrames() # changes main_frame and writes to video
+        self.fnInterpolateFrames(self) # changes main_frame and writes to video
 
         self.contVW.finish(self.main_frames[-1],int(self.C.video_last_frame_dupe_amount))
 
@@ -186,8 +187,10 @@ class InfZoomer:
                 currentImage = self.C.custom_exit_image.resize(
                     (self.C.width, self.C.height), resample=Image.LANCZOS
                 )
-                self.main_frames.append(currentImage.convert("RGB"))
-                # print("using Custom Exit Image")
+                
+                if not self.outerZoom:
+                    self.main_frames.append(currentImage.convert("RGB"))
+
                 self.save2Collect(currentImage, self.out_config, f"exit_img.png")
             else:
                 expanded_image = ImageOps.expand(currentImage, (left, top, right, bottom), fill=(0, 0, 0))
@@ -217,11 +220,20 @@ class InfZoomer:
                 
                 if len(processed.images) > 0:
                     zoomed_img = expanded_image.resize((self.width,self.height), Image.Resampling.LANCZOS)
-                    self.main_frames.append(zoomed_img)
-                    processed.images[0]=self.main_frames[-1]
-                    self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
-                seed = newseed
-                # TODO: seed behavior
+
+                    if self.outerZoom:
+                        self.main_frames[-1] = expanded_image # replace small image
+                        processed.images[0]=expanded_image    # display overscaned image in gallery
+                        self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
+                        
+                        if (i < outpaint_steps-1):
+                            self.main_frames.append(zoomed_img)   # prepare next frame with former content
+
+                    else:
+                        zoomed_img = expanded_image.resize((self.width,self.height), Image.Resampling.LANCZOS)
+                        self.main_frames.append(zoomed_img)
+                        processed.images[0]=self.main_frames[-1]
+                        self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
 
         return processed
     
@@ -325,106 +337,64 @@ class InfZoomer:
                     self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
                 seed = newseed
                 # TODO: seed behavior
-
         return processed
 
 
-    def interpolateFramesOutIn(self):
-        for i in range(len(self.main_frames) - 1):
+    def calculate_interpolation_steps(self, original_size, target_size, steps):
+        width, height = original_size
+        target_width, target_height = target_size
+
+        if width <= 0 or height <= 0 or target_width <= 0 or target_height <= 0 or steps <= 0:
+            return None
+
+        width_step = math.floor((width - target_width) / steps)
+        height_step = math.floor((height - target_height) / steps)
+
+        scaling_steps = [(width - i * width_step, height - i * height_step) for i in range(1,steps)]
+
+        return scaling_steps
+
+   
+    def interpolateFramesOuterZoom(cls,self):
+
+        if 0 == self.C.video_zoom_mode:
+            current_image = self.main_frames[0]
+        elif 1 == self.C.video_zoom_mode:
+            current_image = self.main_frames[-1]
+        else:
+            raise ValueError("unsupported Zoom mode in INfZoom")
+
+        self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
+                                            cls.cropCenterTo(current_image,(self.width,self.height)),
+                                            self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
+
+        outzoomSize = (self.width+self.mask_width*2, self.height+self.mask_height*2)
+        target_size = (self.width, self.height)
+        scaling_steps = self.calculate_interpolation_steps(outzoomSize, target_size, self.num_interpol_frames)
+
+        print(f"{scaling_steps}, length: {len(scaling_steps)}")
+        for x,y in scaling_steps:
+            print (f"ratios: {x/y}")
+        
+        for i in range(len(self.main_frames)):
+            if 0 == self.C.video_zoom_mode:
+                current_image = self.main_frames[0+i]
+            else:
+                current_image = self.main_frames[-1-i]
+
+            self.contVW.append([
+                cls.cropCenterTo(current_image,(self.width, self.height))
+            ])
+
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
             for j in range(self.num_interpol_frames - 1):
 
                 print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
                 #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
-                if self.C.video_zoom_mode:
-                    current_image = self.main_frames[i + 1]
-                else:
-                    current_image = self.main_frames[i + 1]
-                    
-                interpol_image = current_image
-                self.save2Collect(interpol_image, f"interpol_img_{i}_{j}].png")
+                scaled_image = current_image.resize(scaling_steps[j])                    
+                cropped_image = cls.cropCenterTo(scaled_image,(self.width, self.height))
 
-                interpol_width = math.ceil(
-                    ( 1 - (1 - 2 * self.mask_width / self.width) **(1 - (j + 1) / self.num_interpol_frames) ) 
-                    * self.width / 2
-                )
-
-                interpol_height = math.ceil(
-                    ( 1 - (1 - 2 * self.mask_height / self.height) ** (1 - (j + 1) / self.num_interpol_frames) )
-                    * self.height/2
-                )
-
-                interpol_image = interpol_image.crop(
-                    (
-                        interpol_width,
-                        interpol_height,
-                        self.width - interpol_width,
-                        self.height - interpol_height,
-                    )
-                )
-
-                interpol_image = interpol_image.resize((self.width, self.height))
-                self.save2Collect(interpol_image, f"interpol_resize_{i}_{j}.png")
-
-                # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
-                interpol_width2 = math.ceil(
-                    (1 - (self.width - 2 * self.mask_width) / (self.width - 2 * interpol_width))
-                    / 2 * self.width
-                )
-
-                interpol_height2 = math.ceil(
-                    (1 - (self.height - 2 * self.mask_height) / (self.height - 2 * interpol_height))
-                    / 2 * self.height
-                )
-
-                prev_image_fix_crop = shrink_and_paste_on_blank(
-                    self.main_frames[i], interpol_width2, interpol_height2
-                )
-
-                interpol_image.paste(prev_image_fix_crop, mask=prev_image_fix_crop)
-                self.save2Collect(interpol_image, f"interpol_prevcrop_{i}_{j}.png")
-
-                self.contVW.append([interpol_image])
-
-            self.contVW.append([current_image])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                self.contVW.append([cropped_image])
 
 
     def interpolateFramesSmallCenter(self):
@@ -544,3 +514,12 @@ class InfZoomer:
         # resized_img = resized_img.filter(ImageFilter.SHARPEN)
 
         return prev_step_img
+
+    @staticmethod
+    def cropCenterTo(im: Image, toSize: tuple[int,int]):
+        width, height = im.size
+        left = (width - toSize[0])//2
+        top = (height - toSize[1])//2
+        right = (width + toSize[0])//2
+        bottom = (height + toSize[1])//2
+        return im.crop((left, top, right, bottom))

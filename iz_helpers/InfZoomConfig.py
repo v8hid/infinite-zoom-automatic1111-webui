@@ -12,7 +12,7 @@ class InfZoomConfig():
     custom_init_image:Image
     custom_exit_image:Image
     video_frame_rate:int
-    video_zoom_mode:int
+    video_zoom_mode:int  #0: ZoomOut, 1: ZoomIn
     video_start_frame_dupe_amount:int
     video_last_frame_dupe_amount:int
     inpainting_mask_blur:int
