@@ -864,6 +864,7 @@ def PSLumaWipe2(a_color, b_color, luma, l_color=(255, 255, 0, 255), progress=0.0
         out_color_comp = Image.alpha_composite(a_out_color, b_out_color)
         # ensure that the composited images have transparency
         a_color.putalpha(ImageOps.invert(b_color_alpha))
+        #a_color.show("a_color b_color_alpha")
         final_image = Image.alpha_composite(a_color, out_color_comp)
 
     #end = timer()

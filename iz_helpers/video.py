@@ -3,7 +3,7 @@ import imageio
 from .image import draw_gradient_ellipse, alpha_composite_images, blend_images, PSLumaWipe_images2
 import math
 
-def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30, num_interpol_frames=2, blend_invert: bool = False, blend_image= None, blend_type:int = 0, blend_gradient_size: int = 63):
+def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30, num_interpol_frames=2, blend_invert: bool = False, blend_image= None, blend_type:int = 0, blend_gradient_size: int = 63, blend_color = "#ffff00"):
     """
     Writes frames to an mp4 video file
     :param file_path: Path to output video, must end with .mp4
@@ -34,7 +34,7 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
         elif blend_type == 2:
             start_frames = alpha_composite_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount), blend_invert)
         elif blend_type == 3:
-            start_frames = PSLumaWipe_images2(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount), blend_invert,(255,255,0,225))
+            start_frames = PSLumaWipe_images2(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount), blend_invert,blend_color)
         del frames[:num_frames_replaced]
 
         print(f"Blending end: {math.ceil(last_frame_dupe_amount)} next to last frame:{-1 * (num_frames_replaced)}")
@@ -43,7 +43,7 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
         elif blend_type == 2:
             end_frames = alpha_composite_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount), blend_invert)
         elif blend_type == 3:
-            end_frames = PSLumaWipe_images2(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount), blend_invert, (255,255,0,225))
+            end_frames = PSLumaWipe_images2(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount), blend_invert, blend_color)
         frames = frames[:(-1 * num_frames_replaced)]
     else:
         start_frames = [frames[0]] * start_frame_dupe_amount

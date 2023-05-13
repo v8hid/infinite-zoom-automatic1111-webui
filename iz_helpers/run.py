@@ -1,6 +1,6 @@
 import math, time, os
 import numpy as np
-from PIL import Image, ImageFilter, ImageDraw
+from PIL import Image, ImageFilter, ImageDraw, ImageColor
 from modules.ui import plaintext_to_html
 import modules.shared as shared
 from modules.processing import Processed, StableDiffusionProcessing
@@ -208,6 +208,7 @@ def create_zoom(
     blend_mode,
     blend_gradient_size,
     blend_invert_do,
+    blend_color,
     inpainting_denoising_strength=1,
     inpainting_full_res=0,
     inpainting_padding=0,
@@ -243,6 +244,7 @@ def create_zoom(
             blend_mode,
             blend_gradient_size,
             blend_invert_do,
+            blend_color,
             inpainting_denoising_strength,
             inpainting_full_res,
             inpainting_padding,
@@ -318,6 +320,7 @@ def create_zoom_single(
     blend_mode,
     blend_gradient_size,
     blend_invert_do,
+    blend_color,
     inpainting_denoising_strength,
     inpainting_full_res,
     inpainting_padding,
@@ -546,6 +549,7 @@ def create_zoom_single(
         blend_image,
         blend_mode,
         blend_gradient_size,
+        ImageColor.getcolor(blend_color, "RGBA"),
     )
     print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
     return (

@@ -229,6 +229,7 @@ def on_ui_tabs():
                                 value="Luma Wipe",
                                 type="index",
                             )
+                            blend_invert_do = gr.Checkbox(False, label="Reverse Blend/Wipe")
                         with gr.Row():
                             blend_gradient_size = gr.Slider(
                                 label="Blend Gradient size",
@@ -237,13 +238,20 @@ def on_ui_tabs():
                                 value=default_gradient_size,
                                 step=1
                             )
-                            blend_invert_do = gr.Checkbox(False, label="Reverse Blend/Wipe")
-                        gr.Markdown(
-                            """# Important Blend Info:
-Number of Start and Stop Frame Duplication number of frames used for the blend/wipe effect. At 30 Frames per second, 30 frames is 1 second.
-Blend Gradient size determines if blends extend to the border of the images. 61 is typical, higher values may result in frames around steps of your video
-"""
-                        )
+                            blend_color = gr.ColorPicker(
+                                label='Blend Edge Color', 
+                                default='#ffff00'
+                            )
+                        with gr.Accordion("Blend Info"):
+                            gr.Markdown(
+                                """# Important Blend Info:
+    Number of Start and Stop Frame Duplication number of frames used for the blend/wipe effect. At 30 Frames per second, 30 frames is 1 second.
+    Blend Gradient size determines if blends extend to the border of the images. 61 is typical, higher values may result in frames around steps of your video
+
+    Free to use grayscale blend images can be found here: https://github.com/Oncorporation/obs-studio/tree/master/plugins/obs-transitions/data/luma_wipes
+    Ideas for custom blend images: https://www.pexels.com/search/gradient/
+    """
+                            )
 
                 with gr.Tab("Outpaint"):
                     inpainting_mask_blur = gr.Slider(
@@ -326,6 +334,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 blend_mode,
                 blend_gradient_size,
                 blend_invert_do,
+                blend_color,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
