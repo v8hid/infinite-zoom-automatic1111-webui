@@ -43,7 +43,6 @@ def outpaint_steps(
     frame_correction=True,  # TODO: add frame_Correction in UI
 ):
     main_frames = [init_img.convert("RGBA")]
-    main_frames[0] = init_img.convert("RGBA")
     prev_image = init_img.convert("RGBA")
     exit_img = custom_exit_image.convert("RGBA") if custom_exit_image else None
 
@@ -60,21 +59,22 @@ def outpaint_steps(
 
         current_image = main_frames[-1]
 
-        # apply available alpha mask of previous image
-        #if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 0))] != "":
-        #    current_image = apply_alpha_mask(current_image, open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 0))]))
+        ## apply available alpha mask of previous image
+        #if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i))] != "":
+        #    current_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i))])
         #else:
         #    #generate automatic alpha mask
-        #    current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.615 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.89),0.1)
-        #    current_image = apply_alpha_mask(current_image, draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 2.0))
- 
+        #    current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.6175 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.89),0.1)
+        #    current_image_amask = draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 2.5)
+        #current_image = apply_alpha_mask(current_image, current_image_amask)
+
         # shrink image to mask size
         current_image = shrink_and_paste_on_blank(
             current_image, mask_width, mask_height
         )
 
         mask_image = np.array(current_image)[:, :, 3]
-        mask_image = Image.fromarray(255 - mask_image)
+        mask_image = Image.fromarray(255 - mask_image)        
         # create mask (black image with white mask_width width edges)
 
         #prev_image = current_image
@@ -83,11 +83,12 @@ def outpaint_steps(
         #current_image = current_image.convert("RGB")
 
         #keyframes are not inpainted
-        paste_previous_image = not prompt_image_is_keyframe[max(k for k in prompt_image_is_keyframe.keys() if k <= (i + 1))]
+        paste_previous_image = not prompt_image_is_keyframe[(i + 1)]
+        print(f"paste_prev_image: {paste_previous_image} {i} {i + 1}")
 
         if custom_exit_image and ((i + 1) == outpaint_steps):
             current_image = resize_and_crop_image(custom_exit_image, width, height).convert("RGBA")
-            main_frames.append(current_image)
+            exit_img = current_image
             print("using Custom Exit Image")
             save2Collect(current_image, out_config, f"exit_img.png")
 
@@ -116,88 +117,110 @@ def outpaint_steps(
                     main_frames.append(processed.images[0].convert("RGBA"))
                     save2Collect(processed.images[0], out_config, f"outpain_step_{i}.png")
 
-                paste_previous_image = True
+                #paste_previous_image = True
             else:
                 # use prerendered image, known as keyframe. Resize to target size
                 print(f"image {i + 1} is a keyframe: {not paste_previous_image}")
-                current_image = open_image(prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))])
+                current_image = open_image(prompt_images[(i + 1)])
                 current_image = resize_and_crop_image(current_image, width, height).convert("RGBA")
 
                 # if keyframe is last frame, use it as exit image
                 if (not paste_previous_image) and ((i + 1) == outpaint_steps):
                     exit_img = current_image
                     print("using keyframe as exit image")
-                main_frames.append(current_image)
+                else:
+                    main_frames.append(current_image)
                 save2Collect(current_image, out_config, f"key_frame_{i + 1}.png")           
 
         #seed = newseed
         # TODO: seed behavior
 
         # paste previous image on top of current image            
-        if frame_correction and inpainting_mask_blur > 0:
-            corrected_frame = crop_inner_image(
-                main_frames[i + 1], mask_width, mask_height
-            )
-
-            enhanced_img = crop_fethear_ellipse(
-                main_frames[i],
-                30,
-                inpainting_mask_blur / 3 // 2,
-                inpainting_mask_blur / 3 // 2,
-            )
-            save2Collect(main_frames[i], out_config, f"main_frame_{i}")
-            save2Collect(enhanced_img, out_config, f"main_frame_enhanced_{i}")
-            corrected_frame.paste(enhanced_img, mask=enhanced_img)
-            main_frames[i] = corrected_frame
+        if frame_correction and (inpainting_mask_blur > 0):
+            #if 0 <= (i + 1) < len(main_frames):
+            if paste_previous_image and i > 0:
+                corrected_frame = crop_inner_image(
+                    main_frames[i + 1], mask_width, mask_height
+                )
+                enhanced_img = crop_fethear_ellipse(
+                    main_frames[i],
+                    30,
+                    inpainting_mask_blur / 3 // 2,
+                    inpainting_mask_blur / 3 // 2,
+                )
+                save2Collect(main_frames[i], out_config, f"main_frame_{i}")
+                save2Collect(enhanced_img, out_config, f"main_frame_enhanced_{i}")
+                corrected_frame.paste(enhanced_img, mask=enhanced_img)
+                main_frames[i] = corrected_frame
         else: #TEST
-            # paste current image with alpha layer on previous image to merge            
-            if paste_previous_image:
-                # apply predefined or generated alpha mask to current image
+            # paste current image with alpha layer on previous image to merge : paste on i         
+            if paste_previous_image and i > 0:
+                # apply predefined or generated alpha mask to current image: 
+                # current image must be redefined as most current image in frame stack
+                # use previous image alpha mask if available
                 if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-                    current_image = apply_alpha_mask(main_frames[i + 1], open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))]))
+                    current_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))])
                 else:
-                    current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.615 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
-                    current_image = apply_alpha_mask(main_frames[i + 1], draw_gradient_ellipse(main_frames[i + 1].width, main_frames[i + 1].height, current_image_gradient_ratio, 0.0, 2.0))
+                    current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.6175 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
+                    current_image_amask = draw_gradient_ellipse(main_frames[i + 1].width, main_frames[i + 1].height, current_image_gradient_ratio, 0.0, 2.5)
+                current_image = apply_alpha_mask(main_frames[i + 1], current_image_amask)
 
-                # handle previous image alpha layer
+                #handle previous image alpha layer
                 prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
-
-                # apply available alpha mask of previous image (inverted)
+                ## apply available alpha mask of previous image (inverted)
                 if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i))] != "":
-                    prev_image = apply_alpha_mask(prev_image, open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i))]), invert = True)
+                    prev_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i))])
                 else:
-                    prev_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.615 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
-                    prev_image = apply_alpha_mask(prev_image, draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.0), invert = True )
+                    prev_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.6175 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
+                    prev_image_amask = draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.5)
+                prev_image = apply_alpha_mask(prev_image, prev_image_amask, invert = True)
 
                 # merge previous image with current image
                 corrected_frame = crop_inner_image(
                     current_image, mask_width, mask_height
                 )
-                current_image.alpha_composite(prev_image)
-                res = Image.new(current_image.mode, (width, height))
-                paste_pos = (
-                    int((width - current_image.width) / 2),
-                    int((height - current_image.height) / 2),
-                )
-                res.paste(current_image, paste_pos)
-                corrected_frame.paste(res, mask=res)               
-                current_image = corrected_frame           
+                #enhanced_img = crop_fethear_ellipse(
+                #    main_frames[i],
+                #    30,
+                #    inpainting_mask_blur / 3 // 2,
+                #    inpainting_mask_blur / 3 // 2,
+                #)
+                #enhanced_img.show()
+                #input("Press Enter to continue...")
+                #test_enh_img = apply_alpha_mask(main_frames[i], prev_image_amask)
+                #test_enh_img.show()
+                #input("Press Enter to continue...")
+                prev = Image.new(prev_image.mode, (width, height), (255,255,255,255))
+                prev.paste(apply_alpha_mask(main_frames[i], prev_image_amask))
+                #prev.show()
+                corrected_frame.paste(prev, mask=prev)
+                #print(f"corrected_frame pasted")                
+                #corrected_frame.show()
+                #input("Press Enter to continue...")
+                #current_image = corrected_frame
                 
-                main_frames[i] = current_image
-                save2Collect(current_image, out_config, f"main_frame_gradient_{i + 1}")
+                main_frames[i] = corrected_frame
+                save2Collect(corrected_frame, out_config, f"main_frame_gradient_{i + 0}")
             
             #if (not paste_previous_image) and ((i + 1) == outpaint_steps):
             #    # fix initial image by adding alpha layer
-
+                
             #    # fix exit image and frames
             #    backward_image = shrink_and_paste_on_blank(
             #        current_image, mask_width, mask_height
             #    )
+            #    backward_image.show()
+            #    input("Press Enter to continue...")
             #    #handle previous image alpha layer
             #    prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
+            #    prev_image.show()
+            #    input("Press Enter to continue...")
             #    prev_image.alpha_composite(backward_image)
+            #    print(f"no previous image - prev_image with backward Image")
+            #    prev_image.show()
+            #    input("Press Enter to continue...")
             #    main_frames[i - 1] = prev_image
- 
+        
             #print(str(f"Frames: {len(main_frames)}"))
             #print(str(f"Frame previous : {prev_image} {prev_image.mode} ({prev_image.width}, {prev_image.height})"))
             #print(str(f"Frame current : {current_image} {current_image.mode} ({current_image.width}, {current_image.height})"))
@@ -211,10 +234,10 @@ def outpaint_steps(
             #input("Press Enter to continue...")
 
     # Remove extra frames
-    main_frames = main_frames[:(outpaint_steps)]
+    #main_frames = main_frames[:(outpaint_steps)]
     #handle first and last frames, this ensures blends work properly
-    if init_img is not None:
-        main_frames.insert(0, init_img)
+    #if init_img is not None:
+        #main_frames.insert(0, init_img)
     if exit_img is not None:
         main_frames.append(exit_img)
 

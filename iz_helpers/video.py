@@ -3,7 +3,7 @@ import imageio
 from .image import blend_images, draw_gradient_ellipse, alpha_composite_images, luma_wipe_images, PSLumaWipe_images2
 import math
 
-def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30, num_interpol_frames=2, blend=False, blend_image= None):
+def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=15, last_frame_dupe_amount=30, num_interpol_frames=2, blend=False, blend_image= None, blend_type:int = 0):
     """
     Writes frames to an mp4 video file
     :param file_path: Path to output video, must end with .mp4
@@ -22,22 +22,28 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
 
     # Duplicate the start and end frames
     if blend:
-        num_frames_replaced = num_interpol_frames + 2
+        num_frames_replaced = num_interpol_frames
         if blend_image is None:
             blend_image = draw_gradient_ellipse(*frames[0].size, 0.63)
         next_frame = frames[num_frames_replaced]
         next_to_last_frame = frames[(-1 * num_frames_replaced)]
         
         print(f"Blending start: {math.ceil(start_frame_dupe_amount)} next frame:{(num_frames_replaced)}")
-        #start_frames = alpha_composite_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
-        #start_frames = luma_wipe_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
-        start_frames = PSLumaWipe_images2(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount),(255,255,0,225))
+        if blend_type == 1:
+            start_frames = alpha_composite_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
+        elif blend_type == 2:
+            start_frames = luma_wipe_images(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount))
+        else:
+            start_frames = PSLumaWipe_images2(frames[0], next_frame, blend_image, math.ceil(start_frame_dupe_amount),(255,255,0,225))
         del frames[:num_frames_replaced]
 
         print(f"Blending end: {math.ceil(last_frame_dupe_amount)} next to last frame:{-1 * (num_frames_replaced)}")
-        end_frames = alpha_composite_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
-        #end_frames = luma_wipe_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
-        #end_frames = PSLumaWipe_images2(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount),(255,255,0,225))
+        if blend_type == 1:
+            end_frames = alpha_composite_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
+        elif blend_type == 2:
+            end_frames = luma_wipe_images(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount))
+        else:
+            end_frames = PSLumaWipe_images2(next_to_last_frame, frames[-1], blend_image, math.ceil(last_frame_dupe_amount),(255,255,0,225))
         frames = frames[:(-1 * num_frames_replaced)]
     else:
         start_frames = [frames[0]] * start_frame_dupe_amount
