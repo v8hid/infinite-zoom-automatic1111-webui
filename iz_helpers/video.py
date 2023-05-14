@@ -47,7 +47,7 @@ class ContinuousVideoWriter:
 
     _writer = None
     
-    def __init__(self, file_path, initframe, fps, start_frame_dupe_amount=15):
+    def __init__(self, file_path, initframe, fps, start_frame_dupe_amount=15, video_ffmpeg_opts=""):
         """
         Writes initial frame to a new mp4 video file
         :param file_path: Path to output video, must end with .mp4
@@ -56,7 +56,11 @@ class ContinuousVideoWriter:
         :param reversed: if order of images to be reversed (default = True)
         """
 
-        writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)
+        ffopts = []
+        if video_ffmpeg_opts is not "":
+            ffopts= video_ffmpeg_opts.split(" ")
+
+        writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None, ffmpeg_params=ffopts)
         start_frames = [initframe] * start_frame_dupe_amount
         for f in start_frames:
             writer.append_data(np.array(f))

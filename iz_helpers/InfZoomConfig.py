@@ -15,6 +15,7 @@ class InfZoomConfig():
     video_zoom_mode:int  #0: ZoomOut, 1: ZoomIn
     video_start_frame_dupe_amount:int
     video_last_frame_dupe_amount:int
+    video_ffmpeg_opts: str
     inpainting_mask_blur:int
     inpainting_fill_mode:int
     zoom_speed:float

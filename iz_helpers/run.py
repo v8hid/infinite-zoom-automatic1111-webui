@@ -94,7 +94,13 @@ class InfZoomer:
             self.main_frames = self.main_frames[::-1]
 
         if not self.outerZoom:
-            self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], self.main_frames[0],self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
+            self.contVW = ContinuousVideoWriter(
+                self.out_config["video_filename"], 
+                self.main_frames[0],
+                self.C.video_frame_rate,
+                int(self.C.video_start_frame_dupe_amount), 
+                self.C.video_ffmpeg_opts
+            )
         
         self.fnInterpolateFrames() # changes main_frame and writes to video
 
@@ -129,7 +135,7 @@ class InfZoomer:
             )
             self.save2Collect(current_image, f"init_custom.png")
         else:
-            load_model_from_setting("infzoom_txt2img_model", self.C.progress, "Loading Model for txt2img: ")
+            load_model_from_setting("infzoom_inpainting_model", self.C.progress, "Loading Model for txt2img: ")
 
             processed, newseed = self.renderFirstFrame()
 
@@ -451,7 +457,8 @@ class InfZoomer:
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
                                             self.cropCenterTo(current_image,(self.width,self.height)),
-                                            self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
+                                            self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount),
+                                            self.C.video_ffmpeg_opts)
 
         outzoomSize = (self.width+self.mask_width*2, self.height+self.mask_height*2)
         target_size = (self.width, self.height)
@@ -491,7 +498,8 @@ class InfZoomer:
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
                                 (firstImage,(self.width,self.height)),
-                                self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount))
+                                self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount),
+                                self.C.video_ffmpeg_opts)
 
         for i in range(len(self.main_frames) - 1):
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)

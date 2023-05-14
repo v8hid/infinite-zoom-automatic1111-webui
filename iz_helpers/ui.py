@@ -215,6 +215,20 @@ def on_ui_tabs():
                         step=0.1,
                         info="Zoom speed in seconds (higher values create slower zoom)",
                     )
+                    with gr.Accordion("FFMPEG Expert", open=False):
+                        gr.Markdown(
+                            """# I need FFMPEG control
+You can put CLI options here as documented https://ffmpeg.org/ffmpeg.html#Options  
+
+## Examples:
+* ```-vf scale=320:240 ``` scales your video to 320x240
+* ```-c:v libx264 -preset veryslow -qp 0``` uses lossless compression
+"""
+)
+                        video_ffmpeg_opts=gr.Textbox(
+                            value="", label="FFMPEG Opts"
+                        )
+                        
 
                 with gr.Tab("Outpaint"):
                     outpaint_amount_px = gr.Slider(
@@ -303,6 +317,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 video_zoom_mode,
                 video_start_frame_dupe_amount,
                 video_last_frame_dupe_amount,
+                video_ffmpeg_opts,
                 inpainting_mask_blur,
                 inpainting_fill_mode,
                 video_zoom_speed,
