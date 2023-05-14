@@ -30,6 +30,7 @@ def createZoom(
     upscale_by:float,
     overmask:int,
     outpaintStrategy:str,
+    outpaint_amount_px: int,
     inpainting_denoising_strength:float=1,
     inpainting_full_res:int =0,
     inpainting_padding:int=0,
@@ -65,6 +66,7 @@ def createZoom(
         inpainting_denoising_strength,
         inpainting_full_res,
         inpainting_padding,
+        outpaint_amount_px,
         progress
     )
     iz= InfZoomer(izc)

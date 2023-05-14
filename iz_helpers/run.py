@@ -1,5 +1,6 @@
 import math, time, os
 import numpy as np
+from scipy.signal import savgol_filter
 from typing import Callable, Any
 from PIL import Image, ImageFilter, ImageOps, ImageDraw
 
@@ -43,8 +44,9 @@ class InfZoomer:
 
         self.current_seed = self.C.seed
 
-        self.mask_width  = self.width  * 1//16   # was initially 512px => 128px
-        self.mask_height = self.height * 1//16   # was initially 512px => 128px
+        self.mask_width  = self.C.outpaint_amount_px  # was initially 512px => 128px
+        self.mask_height = self.C.outpaint_amount_px  # was initially 512px => 128px
+
         self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed)
 
         if (self.C.outpaintStrategy == "Corners"):
@@ -110,7 +112,7 @@ class InfZoomer:
 
     def doUpscaling(self):
         for idx,mf in enumerate(self.main_frames):
-            print (f"\033[KInfZoom: Upscaling mainframe: {idx}   \r")
+            print (f"\033[KInfZoom: Upscaling mainframe: {idx}   \r",end="")
             self.main_frames[idx]=do_upscaleImg(mf, self.C.upscale_do, self.C.upscaler_name, self.C.upscale_by)
 
         self.width  = self.main_frames[0].width
@@ -164,6 +166,7 @@ class InfZoomer:
         left = right = int(self.mask_width)
         top = bottom = int(self.mask_height)
 
+        # 512 is here the inpainting size- 512 is native min size even on 2.1 models
         corners = [
             (0, 0),  
             (new_width - 512, 0),  
@@ -172,6 +175,7 @@ class InfZoomer:
         ]
         masked_images = []
         
+        white = Image.new("1", (new_width,new_height), 0)
         for idx, corner in enumerate(corners):
             white = Image.new("1", (new_width,new_height), 0)
             draw = ImageDraw.Draw(white)
@@ -210,11 +214,11 @@ class InfZoomer:
                         512,  #outpaintsizeH
                         expanded_image,
                         cornermask,
-                        1, #inpainting_denoising_strength,
-                        0, # inpainting_mask_blur,
-                        2, ## noise? fillmode
-                        True,  # only masked, not full, keep size of expandedimage!
-                        0 #inpainting_padding,
+                        self.C.inpainting_denoising_strength,
+                        self.C.inpainting_mask_blur,
+                        self.C.inpainting_fill_mode,
+                        True, # self.C.inpainting_full_res,
+                        self.C.inpainting_padding,
                     )
                     expanded_image = processed.images[0]
                 #
@@ -235,11 +239,6 @@ class InfZoomer:
                         self.main_frames.append(zoomed_img)
                         processed.images[0]=self.main_frames[-1]
                         self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
-
-
-
-        # debug:
-        for i in masked_images: processed.images.append(i)
 
         return processed
     
@@ -459,10 +458,9 @@ class InfZoomer:
 
 
         scaling_steps = self.calculate_interpolation_steps_linear(outzoomSize, target_size, self.num_interpol_frames)
-
-        print(f"{scaling_steps}, length: {len(scaling_steps)}")
-        for x,y in scaling_steps:
-            print (f"ratios: {x/y}")
+        print(f"Before: {scaling_steps}, length: {len(scaling_steps)}")
+        scaling_steps = self.apply_savitzky_golay_filter(scaling_steps,self.width/self.height)
+        print(f"After: {scaling_steps}, length: {len(scaling_steps)}")
         
         for i in range(len(self.main_frames)):
             if 0 == self.C.video_zoom_mode:
@@ -476,10 +474,9 @@ class InfZoomer:
 
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
             for j in range(self.num_interpol_frames - 1):
-
-                print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
+                print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r",end="")
                 #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
-                scaled_image = current_image.resize(scaling_steps[j])                    
+                scaled_image = current_image.resize(scaling_steps[j], Image.LANCZOS)                    
                 cropped_image = self.cropCenterTo(scaled_image,(self.width, self.height))
 
                 self.contVW.append([cropped_image])
@@ -500,7 +497,7 @@ class InfZoomer:
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
             for j in range(self.num_interpol_frames - 1):
 
-                print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r")
+                print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r",end="")
                 #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
                 if self.C.video_zoom_mode:
                     current_image = self.main_frames[i + 1]
@@ -621,3 +618,26 @@ class InfZoomer:
         right = (width + toSize[0])//2
         bottom = (height + toSize[1])//2
         return im.crop((left, top, right, bottom))
+
+
+    def apply_savitzky_golay_filter(self,scaling_steps, original_ratio, window_length=5, polyorder=2):
+        widths, heights = zip(*scaling_steps)
+        smoothed_widths = savgol_filter(widths, window_length, polyorder)
+        smoothed_heights = savgol_filter(heights, window_length, polyorder)
+
+        integer_steps = []
+        for new_width, new_height in zip(smoothed_widths, smoothed_heights):
+            floor_width, ceil_width = int(new_width // 1), int(new_width // 1 + 1)
+            floor_height, ceil_height = int(new_height // 1), int(new_height // 1 + 1)
+
+            floor_ratio = floor_width / floor_height
+            ceil_ratio = ceil_width / ceil_height
+
+            if abs(floor_ratio - original_ratio) < abs(ceil_ratio - original_ratio):
+                new_width, new_height = floor_width, floor_height
+            else:
+                new_width, new_height = ceil_width, ceil_height
+
+            integer_steps.append((new_width, new_height))
+
+        return integer_steps

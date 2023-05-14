@@ -217,6 +217,14 @@ def on_ui_tabs():
                     )
 
                 with gr.Tab("Outpaint"):
+                    outpaint_amount_px = gr.Slider(
+                        label="Outpaint pixels",
+                        minimum=4,
+                        maximum=508,
+                        step=8,
+                        value=64,
+                    )
+
                     inpainting_mask_blur = gr.Slider(
                         label="Mask Blur",
                         minimum=0,
@@ -307,7 +315,8 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 upscaler_name,
                 upscale_by,
                 overmask,
-                outpaintStrategy
+                outpaintStrategy,
+                outpaint_amount_px
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )

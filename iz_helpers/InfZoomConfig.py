@@ -31,4 +31,5 @@ class InfZoomConfig():
     inpainting_denoising_strength:float=1
     inpainting_full_res:int =0
     inpainting_padding:int=0
+    outpaint_amount_px: int=64
     progress:any=None
