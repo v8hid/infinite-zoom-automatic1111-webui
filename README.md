@@ -106,6 +106,9 @@ It works on free colab plan
   <img src="https://img.shields.io/static/v1?label=github&message=repository&color=blue&style=flat&logo=github&logoColor=white" alt="GitHub Repo"/>
 </a>
 
+## Additional Resources
+Luma Wipes ideas [Videezy](https://www.videezy.com/free-video/luma-wipe) and free Luma Wipes to use immediately [GIT](https://github.com/Oncorporation/obs-studio/tree/master/plugins/obs-transitions/data/luma_wipes)
+
 ## Contributing
 
 Contributions are welcome! Please follow these guidelines:

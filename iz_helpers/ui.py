@@ -15,6 +15,7 @@ from .static_variables import (
     default_cfg_scale,
     default_mask_blur,
     default_sampler,
+    default_gradient_size,
 )
 from .helpers import validatePromptJson_throws, putPrompts, clearPrompts
 from .prompt_util import readJsonPrompt
@@ -219,6 +220,30 @@ def on_ui_tabs():
                         step=0.1,
                         info="Zoom speed in seconds (higher values create slower zoom)",
                     )
+                    with gr.Accordion("Blend settings"):
+                        with gr.Row():
+                            blend_image = gr.Image(type="pil", label="Custom in/out Blend Image")
+                            blend_mode = gr.Radio(
+                                label="Blend Mode",
+                                choices=["None", "Simple Blend", "Alpha Composite", "Luma Wipe"],
+                                value="Luma Wipe",
+                                type="index",
+                            )
+                        with gr.Row():
+                            blend_gradient_size = gr.Slider(
+                                label="Blend Gradient size",
+                                minimum=25,
+                                maximum=75,
+                                value=default_gradient_size,
+                                step=1
+                            )
+                            blend_invert_do = gr.Checkbox(False, label="Reverse Blend/Wipe")
+                        gr.Markdown(
+                            """# Important Blend Info:
+Number of Start and Stop Frame Duplication number of frames used for the blend/wipe effect. At 30 Frames per second, 30 frames is 1 second.
+Blend Gradient size determines if blends extend to the border of the images. 61 is typical, higher values may result in frames around steps of your video
+"""
+                        )
 
                 with gr.Tab("Outpaint"):
                     inpainting_mask_blur = gr.Slider(
@@ -234,6 +259,7 @@ def on_ui_tabs():
                         value="latent noise",
                         type="index",
                     )
+
 
                 with gr.Tab("Post proccess"):
                     upscale_do = gr.Checkbox(False, label="Enable Upscale")
@@ -296,6 +322,10 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 upscale_do,
                 upscaler_name,
                 upscale_by,
+                blend_image,
+                blend_mode,
+                blend_gradient_size,
+                blend_invert_do,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )

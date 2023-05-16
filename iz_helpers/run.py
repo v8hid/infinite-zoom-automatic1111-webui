@@ -41,6 +41,7 @@ def outpaint_steps(
     mask_height,
     custom_exit_image,
     frame_correction=True,  # TODO: add frame_Correction in UI
+    blend_gradient_size = 61,
 ):
     main_frames = [init_img.convert("RGBA")]
     prev_image = init_img.convert("RGBA")
@@ -59,15 +60,6 @@ def outpaint_steps(
 
         current_image = main_frames[-1]
 
-        ## apply available alpha mask of previous image
-        #if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i))] != "":
-        #    current_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i))])
-        #else:
-        #    #generate automatic alpha mask
-        #    current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.6175 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.89),0.1)
-        #    current_image_amask = draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 2.5)
-        #current_image = apply_alpha_mask(current_image, current_image_amask)
-
         # shrink image to mask size
         current_image = shrink_and_paste_on_blank(
             current_image, mask_width, mask_height
@@ -76,11 +68,6 @@ def outpaint_steps(
         mask_image = np.array(current_image)[:, :, 3]
         mask_image = Image.fromarray(255 - mask_image)        
         # create mask (black image with white mask_width width edges)
-
-        #prev_image = current_image
-
-        # inpainting step
-        #current_image = current_image.convert("RGB")
 
         #keyframes are not inpainted
         paste_previous_image = not prompt_image_is_keyframe[(i + 1)]
@@ -161,83 +148,31 @@ def outpaint_steps(
                 if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
                     current_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))])
                 else:
-                    current_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.6175 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
+                    current_image_gradient_ratio = (blend_gradient_size / 100) #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
                     current_image_amask = draw_gradient_ellipse(main_frames[i + 1].width, main_frames[i + 1].height, current_image_gradient_ratio, 0.0, 2.5)
                 current_image = apply_alpha_mask(main_frames[i + 1], current_image_amask)
 
                 #handle previous image alpha layer
-                prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
+                #prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
                 ## apply available alpha mask of previous image (inverted)
                 if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i))] != "":
                     prev_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i))])
                 else:
-                    prev_image_gradient_ratio = (inpainting_mask_blur / 100) if inpainting_mask_blur > 0 else 0.6175 #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
+                    prev_image_gradient_ratio = (blend_gradient_size / 100) #max((min(current_image.width/current_image.height,current_image.height/current_image.width) * 0.925),0.1)
                     prev_image_amask = draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.5)
-                prev_image = apply_alpha_mask(prev_image, prev_image_amask, invert = True)
+                #prev_image = apply_alpha_mask(prev_image, prev_image_amask, invert = True)
 
                 # merge previous image with current image
                 corrected_frame = crop_inner_image(
                     current_image, mask_width, mask_height
                 )
-                #enhanced_img = crop_fethear_ellipse(
-                #    main_frames[i],
-                #    30,
-                #    inpainting_mask_blur / 3 // 2,
-                #    inpainting_mask_blur / 3 // 2,
-                #)
-                #enhanced_img.show()
-                #input("Press Enter to continue...")
-                #test_enh_img = apply_alpha_mask(main_frames[i], prev_image_amask)
-                #test_enh_img.show()
-                #input("Press Enter to continue...")
                 prev = Image.new(prev_image.mode, (width, height), (255,255,255,255))
                 prev.paste(apply_alpha_mask(main_frames[i], prev_image_amask))
-                #prev.show()
                 corrected_frame.paste(prev, mask=prev)
-                #print(f"corrected_frame pasted")                
-                #corrected_frame.show()
-                #input("Press Enter to continue...")
-                #current_image = corrected_frame
                 
                 main_frames[i] = corrected_frame
                 save2Collect(corrected_frame, out_config, f"main_frame_gradient_{i + 0}")
             
-            #if (not paste_previous_image) and ((i + 1) == outpaint_steps):
-            #    # fix initial image by adding alpha layer
-                
-            #    # fix exit image and frames
-            #    backward_image = shrink_and_paste_on_blank(
-            #        current_image, mask_width, mask_height
-            #    )
-            #    backward_image.show()
-            #    input("Press Enter to continue...")
-            #    #handle previous image alpha layer
-            #    prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
-            #    prev_image.show()
-            #    input("Press Enter to continue...")
-            #    prev_image.alpha_composite(backward_image)
-            #    print(f"no previous image - prev_image with backward Image")
-            #    prev_image.show()
-            #    input("Press Enter to continue...")
-            #    main_frames[i - 1] = prev_image
-        
-            #print(str(f"Frames: {len(main_frames)}"))
-            #print(str(f"Frame previous : {prev_image} {prev_image.mode} ({prev_image.width}, {prev_image.height})"))
-            #print(str(f"Frame current : {current_image} {current_image.mode} ({current_image.width}, {current_image.height})"))
-            ##print(str(f"Frame corrected_frame : {corrected_frame} {corrected_frame.mode} ({corrected_frame.width}, {corrected_frame.height})"))
-            ##print(str(f"Frame res - paste position: {paste_pos}"))
-            ##print(str(f"Frame res : {res} {res.mode} ({res.width}, {res.height})"))
-            #print(str(f"Frame {i - 1} : {main_frames[i - 1]}"))
-            #print(str(f"Frame {i} : {main_frames[i]}"))            
-            #print(str(f"Frame {i + 1} : {main_frames[i + 1]}"))
-            #print(str(f"Frame {-1} : {main_frames[-1]}"))
-            #input("Press Enter to continue...")
-
-    # Remove extra frames
-    #main_frames = main_frames[:(outpaint_steps)]
-    #handle first and last frames, this ensures blends work properly
-    #if init_img is not None:
-        #main_frames.insert(0, init_img)
     if exit_img is not None:
         main_frames.append(exit_img)
 
@@ -269,6 +204,10 @@ def create_zoom(
     upscale_do,
     upscaler_name,
     upscale_by,
+    blend_image,
+    blend_mode,
+    blend_gradient_size,
+    blend_invert_do,
     inpainting_denoising_strength=1,
     inpainting_full_res=0,
     inpainting_padding=0,
@@ -300,6 +239,10 @@ def create_zoom(
             upscale_do,
             upscaler_name,
             upscale_by,
+            blend_image,
+            blend_mode,
+            blend_gradient_size,
+            blend_invert_do,
             inpainting_denoising_strength,
             inpainting_full_res,
             inpainting_padding,
@@ -371,6 +314,10 @@ def create_zoom_single(
     upscale_do,
     upscaler_name,
     upscale_by,
+    blend_image,
+    blend_mode,
+    blend_gradient_size,
+    blend_invert_do,
     inpainting_denoising_strength,
     inpainting_full_res,
     inpainting_padding,
@@ -492,7 +439,8 @@ def create_zoom_single(
         mask_width,
         mask_height,
         custom_exit_image,
-        False
+        False,
+        blend_gradient_size,
     )
 
     #for k in range(len(main_frames)):
@@ -594,8 +542,10 @@ def create_zoom_single(
         int(video_start_frame_dupe_amount),
         int(video_last_frame_dupe_amount),
         num_interpol_frames,
-        True,
-        open_image("G:\\Projects\\obs-studio\\plugins\\obs-transitions\\data\\luma_wipes\\derez-top.png")
+        blend_invert_do,
+        blend_image,
+        blend_mode,
+        blend_gradient_size,
     )
     print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
     return (

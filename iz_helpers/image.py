@@ -164,7 +164,7 @@ def lerp_imagemath_RGBA(img1, img2, alphaimg, factor:int = 50):
     Returns:
     A PIL.Image object representing the resulting interpolated image.
     """
-    start = timer()
+    #start = timer()
     # create alpha and alpha inverst from luma wipe image
     #  multiply the time factor
     if img1.mode != "RGBA":
@@ -186,8 +186,8 @@ def lerp_imagemath_RGBA(img1, img2, alphaimg, factor:int = 50):
     #r1 = ImageMath.eval("convert(int(a*b), 'L')", a=r1, b=factor)    
     # Merge the color bands back into an RGBA image
     rebuilt_image = Image.merge("RGBA", (rl, gl, bl, alphaimg.convert('L')))
-    end = timer()
-    print(f"lerp_imagemath_rgba: {end - start}")
+    #end = timer()
+    #print(f"lerp_imagemath_rgba: {end - start}")
     return rebuilt_image
    
 
@@ -206,7 +206,7 @@ def clip_gradient_image(gradient_image, min_value:int = 50, max_value:int =75, i
     Returns:
     A PIL.Image object representing the adjusted gradient image.
     """
-    start = timer()
+    #start = timer()
     # Convert the image to grayscale if needed
     if gradient_image.mode != "L":
         gradient_image = gradient_image.convert("L")
@@ -237,8 +237,8 @@ def clip_gradient_image(gradient_image, min_value:int = 50, max_value:int =75, i
     final_image = ImageOps.grayscale(mapped_image)
     if invert:
         final_image = ImageOps.invert(final_image)
-    end = timer()
-    print(end - start)
+    #end = timer()
+    #print(end - start)
     return final_image
 
 def resize_image_with_aspect_ratio(image: Image, basewidth: int = 512, baseheight: int = 512) -> Image:
@@ -492,16 +492,7 @@ def draw_gradient_ellipse(width=512, height=512, white_amount=1.0, rotation = 0.
     # Apply brightness method of ImageEnhance class
     image = ImageEnhance.Contrast(image).enhance(contrast).convert('RGBA') 
     # Apply the alpha mask to the image
-    image = apply_alpha_mask(image, image) 
-    # Define the radial gradient parameters
-    #ellipse_width, ellipse_height = (int((width * white_amount) // 1.5), int((height * white_amount) // 1.5))
-    #ellipse_colors = [(255, 255, 255, 255), (0, 0, 0, 0)]
-    # Create a new image for inner ellipse
-    #inner_ellipse = Image.new("L", size, 0)
-    #inner_ellipse = make_gradient_v2(width, height, center[0], center[1], ellipse_width, ellipse_height, theta)
-    #inner_ellipse = apply_alpha_mask(inner_ellipse, inner_ellipse)    
-    #image.paste(inner_ellipse, center, mask=inner_ellipse)    
-    # Creating object of Brightness class
+    image = apply_alpha_mask(image, image)
     # Return the result image
     return image
 
@@ -651,22 +642,20 @@ def multiply_alpha(image, factor):
     print(f"multiply_alpha:{end - start}")
     return result_image
 
-def blend_images(start_image: Image, stop_image: Image, gray_image: Image, num_frames: int) -> list:
+def blend_images(start_image: Image, stop_image: Image, num_frames: int, invert:bool = False) -> list:
     """
-    Blend two images together by using the gray image as the alpha amount of each frame.
+    Blend two images together via the alpha amount of each frame.
     This function takes in three parameters:
     - start_image: the starting PIL image in RGBA mode
     - stop_image: the target PIL image in RGBA mode
-    - gray_image: a gray scale PIL image of the same size as start_image and stop_image
     - num_frames: the number of frames to generate in the blending animation
     
     The function returns a list of PIL images representing the blending animation.
     """
     # Initialize the list of blended frames
     blended_frames = []
-    #set alpha layers of images to be blended - does nothing!
-    #start_image = apply_alpha_mask(start_image, gray_image)
-    #stop_image = apply_alpha_mask(stop_image, gray_image, invert = True)
+    if (invert):
+        start_image, stop_image = stop_image, start_image
     # Generate each frame of the blending animation
     for i in range(num_frames):
         start = timer()
@@ -685,7 +674,7 @@ def blend_images(start_image: Image, stop_image: Image, gray_image: Image, num_f
     # Return the list of blended frames
     return blended_frames
 
-def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Image, num_frames: int) -> list:
+def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Image, num_frames: int, invert:bool = False) -> list:
     """
     Blend two images together by using the gray image as the alpha amount of each frame.
     This function takes in three parameters:
@@ -698,7 +687,8 @@ def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Im
     """    
     # Initialize the list of blended frames
     ac_frames = []
-
+    if (invert):
+        gray_image = ImageOps.invert(gray_image)
     #set alpha layers of images to be blended
     start_image_c = apply_alpha_mask(start_image.copy(), gray_image)
     stop_image_c = apply_alpha_mask(stop_image.copy(), gray_image, invert = False)
@@ -722,104 +712,104 @@ def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Im
     # Return the list of blended frames
     return ac_frames
 
-def luma_wipe_images(start_image: Image, stop_image: Image, alpha: Image, num_frames: int) -> list:
-    #progress(0, status='Generating luma wipe...')    
-    lw_frames = []
-    for i in range(num_frames):
-        start = timer()
-        # Compute the luma value for this frame
-        luma_progress = i / (num_frames - 1)
-        # Create a new image for the transition
-        transition = Image.new("RGBA", start_image.size)
-        # Loop over each pixel in the alpha layer
-        for x in range(alpha.width):
-            for y in range(alpha.height):
-                # Compute the luma value for this pixel
-                luma = alpha.getpixel((x, y))[0] / 255.0
-                if luma_progress >= luma:
-                    # Interpolate between the two images based on the luma value
-                    pixel = (
-                        int(start_image.getpixel((x, y))[0] * (1 - luma) + stop_image.getpixel((x, y))[0] * luma),
-                        int(start_image.getpixel((x, y))[1] * (1 - luma) + stop_image.getpixel((x, y))[1] * luma),
-                        int(start_image.getpixel((x, y))[2] * (1 - luma) + stop_image.getpixel((x, y))[2] * luma),
-                        int(255 * luma_progress)  # Set the alpha value based on the luma value
-                    )        
-                    # Set the new pixel in the transition image
-                    transition.putpixel((x, y), pixel)
-                else:
-                    # Set the start pixel in the transition image
-                    transition.putpixel((x, y), start_image.getpixel((x, y)))
-        # Append the transition image to the list   
-        lw_frames.append(transition)
-        #progress((x + 1) / num_frames)
-        end = timer()
-        print(f"luma_wipe:{end - start}")
-    return lw_frames
+###def luma_wipe_images(start_image: Image, stop_image: Image, alpha: Image, num_frames: int) -> list:
+###    #progress(0, status='Generating luma wipe...')    
+###    lw_frames = []
+###    for i in range(num_frames):
+###        start = timer()
+###        # Compute the luma value for this frame
+###        luma_progress = i / (num_frames - 1)
+###        # Create a new image for the transition
+###        transition = Image.new("RGBA", start_image.size)
+###        # Loop over each pixel in the alpha layer
+###        for x in range(alpha.width):
+###            for y in range(alpha.height):
+###                # Compute the luma value for this pixel
+###                luma = alpha.getpixel((x, y))[0] / 255.0
+###                if luma_progress >= luma:
+###                    # Interpolate between the two images based on the luma value
+###                    pixel = (
+###                        int(start_image.getpixel((x, y))[0] * (1 - luma) + stop_image.getpixel((x, y))[0] * luma),
+###                        int(start_image.getpixel((x, y))[1] * (1 - luma) + stop_image.getpixel((x, y))[1] * luma),
+###                        int(start_image.getpixel((x, y))[2] * (1 - luma) + stop_image.getpixel((x, y))[2] * luma),
+###                        int(255 * luma_progress)  # Set the alpha value based on the luma value
+###                    )        
+###                    # Set the new pixel in the transition image
+###                    transition.putpixel((x, y), pixel)
+###                else:
+###                    # Set the start pixel in the transition image
+###                    transition.putpixel((x, y), start_image.getpixel((x, y)))
+###        # Append the transition image to the list   
+###        lw_frames.append(transition)
+###        #progress((x + 1) / num_frames)
+###        end = timer()
+###        print(f"luma_wipe:{end - start}")
+###    return lw_frames
 
-def srgb_nonlinear_to_linear_channel(u):
-    return (u / 12.92) if (u <= 0.04045) else pow((u + 0.055) / 1.055, 2.4)
+###def srgb_nonlinear_to_linear_channel(u):
+###    return (u / 12.92) if (u <= 0.04045) else pow((u + 0.055) / 1.055, 2.4)
 
-def srgb_nonlinear_to_linear(v):
-    return [srgb_nonlinear_to_linear_channel(x) for x in v]
+###def srgb_nonlinear_to_linear(v):
+###    return [srgb_nonlinear_to_linear_channel(x) for x in v]
 
-#result_img = eval("convert('RGBA')", lambda x, y: PSLumaWipe(img_a.getpixel((x,y)), img_b.getpixel((x,y)), test_g_image.getpixel((x,y))[0]/255,(1,0,0,.5), 0.25, False, 0.1, 0.01, 0.01))
-#list(np.divide((255,255,245,225),255))
-def PSLumaWipe(a_color, b_color, luma, l_color=(255, 255, 255, 255), progress=0.0, invert=False, softness=0.01, start_adjust = 0.01, stop_adjust = 0.0):    
-    # - adjust for min and max. Do not process if luma value is outside min or max
-    if ((luma >= (start_adjust)) and (luma <= (1 - stop_adjust))):
-        if (invert):
-            luma = 1.0 - luma
-        # user color with luma
-        out_color = np.array([l_color[0], l_color[1], l_color[2], luma * 255])
-        time = lerp(0.0, 1.0 + softness, progress)
-        #print(f"softness: {str(softness)}  out_color: {str(out_color)} a_color: {str(a_color)} b_color: {str(b_color)} time: {str(time)} luma: {str(luma)} progress: {str(progress)}")
-        # if luma less than time, do not blend color
-        if (luma <= time - softness):
-            alpha_behind = np.clip(1.0 - (time - softness - luma) / softness, 0.0, 1.0)
-            return tuple(np.round(lerp(b_color, out_color, alpha_behind)).astype(int))
-        # if luma greater than time, show original color
-        if (luma >= time):
-            return a_color
-        alpha = (time - luma) / softness
-        out_color = lerp(a_color, b_color + out_color, alpha)
-        #print(f"alpha: {str(alpha)}  out_color: {str(out_color)} time: {str(time)} luma: {str(luma)}")
-        out_color = srgb_nonlinear_to_linear(out_color)        
-        return tuple(np.round(out_color).astype(int))
-    else:
-        # return original pixel color
-        return a_color
+####result_img = eval("convert('RGBA')", lambda x, y: PSLumaWipe(img_a.getpixel((x,y)), img_b.getpixel((x,y)), test_g_image.getpixel((x,y))[0]/255,(1,0,0,.5), 0.25, False, 0.1, 0.01, 0.01))
+####list(np.divide((255,255,245,225),255))
+###def PSLumaWipe(a_color, b_color, luma, l_color=(255, 255, 255, 255), progress=0.0, invert=False, softness=0.01, start_adjust = 0.01, stop_adjust = 0.0):    
+###    # - adjust for min and max. Do not process if luma value is outside min or max
+###    if ((luma >= (start_adjust)) and (luma <= (1 - stop_adjust))):
+###        if (invert):
+###            luma = 1.0 - luma
+###        # user color with luma
+###        out_color = np.array([l_color[0], l_color[1], l_color[2], luma * 255])
+###        time = lerp(0.0, 1.0 + softness, progress)
+###        #print(f"softness: {str(softness)}  out_color: {str(out_color)} a_color: {str(a_color)} b_color: {str(b_color)} time: {str(time)} luma: {str(luma)} progress: {str(progress)}")
+###        # if luma less than time, do not blend color
+###        if (luma <= time - softness):
+###            alpha_behind = np.clip(1.0 - (time - softness - luma) / softness, 0.0, 1.0)
+###            return tuple(np.round(lerp(b_color, out_color, alpha_behind)).astype(int))
+###        # if luma greater than time, show original color
+###        if (luma >= time):
+###            return a_color
+###        alpha = (time - luma) / softness
+###        out_color = lerp(a_color, b_color + out_color, alpha)
+###        #print(f"alpha: {str(alpha)}  out_color: {str(out_color)} time: {str(time)} luma: {str(luma)}")
+###        out_color = srgb_nonlinear_to_linear(out_color)        
+###        return tuple(np.round(out_color).astype(int))
+###    else:
+###        # return original pixel color
+###        return a_color
 
-def PSLumaWipe_images(start_image: Image, stop_image: Image, luma_wipe_image: Image, num_frames: int, transition_color: tuple[int, int, int, int] = (255,255,255,255)) -> list:
-    #progress(0, status='Generating luma wipe...')
-    # fix transition_color to relative 0.0 - 1.0    
-    #luma_color = list(np.divide(transition_color,255))
+###def PSLumaWipe_images(start_image: Image, stop_image: Image, luma_wipe_image: Image, num_frames: int, transition_color: tuple[int, int, int, int] = (255,255,255,255)) -> list:
+###    #progress(0, status='Generating luma wipe...')
+###    # fix transition_color to relative 0.0 - 1.0    
+###    #luma_color = list(np.divide(transition_color,255))
     
-    softness = 0.03
-    lw_frames = []
-    lw_frames.append(start_image)
-    width, height = start_image.size
-    #compensate for different image sizes for LumaWipe
-    if (start_image.size != luma_wipe_image.size):
-        luma_wipe_image = resize_and_crop_image(luma_wipe_image,width,height)
-    # call PSLumaWipe for each pixel
-    for i in range(num_frames):
-        start = timer()
-        # Compute the luma value for this frame
-        luma_progress = i / (num_frames - 1)
-        transition = Image.new(start_image.mode, (width, height))        
-        # apply to each pixel in the image
-        for x in range(width):
-            for y in range(height):
-                # call PSLumaWipe for each pixel
-                pixel = PSLumaWipe(start_image.getpixel((x, y)), stop_image.getpixel((x, y)), luma_wipe_image.getpixel((x, y))[0]/255, transition_color, luma_progress, False, softness, 0.01, 0.00)
-                transition.putpixel((x, y), pixel)
-        lw_frames.append(transition)
-        print(f"Luma Wipe frame:{len(lw_frames)}")
-        #lw_frames[-1].show()
-        end = timer()
-        print(f"PSLumaWipe:{end - start}")
-    lw_frames.append(stop_image)
-    return lw_frames
+###    softness = 0.03
+###    lw_frames = []
+###    lw_frames.append(start_image)
+###    width, height = start_image.size
+###    #compensate for different image sizes for LumaWipe
+###    if (start_image.size != luma_wipe_image.size):
+###        luma_wipe_image = resize_and_crop_image(luma_wipe_image,width,height)
+###    # call PSLumaWipe for each pixel
+###    for i in range(num_frames):
+###        start = timer()
+###        # Compute the luma value for this frame
+###        luma_progress = i / (num_frames - 1)
+###        transition = Image.new(start_image.mode, (width, height))        
+###        # apply to each pixel in the image
+###        for x in range(width):
+###            for y in range(height):
+###                # call PSLumaWipe for each pixel
+###                pixel = PSLumaWipe(start_image.getpixel((x, y)), stop_image.getpixel((x, y)), luma_wipe_image.getpixel((x, y))[0]/255, transition_color, luma_progress, False, softness, 0.01, 0.00)
+###                transition.putpixel((x, y), pixel)
+###        lw_frames.append(transition)
+###        print(f"Luma Wipe frame:{len(lw_frames)}")
+###        #lw_frames[-1].show()
+###        end = timer()
+###        print(f"PSLumaWipe:{end - start}")
+###    lw_frames.append(stop_image)
+###    return lw_frames
 
 #result_img = , 0.25, False, 0.1, 0.01, 0.01))
 #list(np.divide((255,255,245,225),255))
@@ -836,7 +826,7 @@ def PSLumaWipe2(a_color, b_color, luma, l_color=(255, 255, 0, 255), progress=0.0
     #5. merge or composite images together
     #6. return the merged image
     # - adjust for min and max. Do not process if luma value is outside min or max
-    start = timer()
+    #start = timer()
     if (progress <= start_adjust):
         final_image = a_color
     elif (progress >= (1 - stop_adjust)):
@@ -872,22 +862,16 @@ def PSLumaWipe2(a_color, b_color, luma, l_color=(255, 255, 0, 255), progress=0.0
         b_out_color = b_color.copy()
         b_out_color.putalpha(b_color_alpha)
         out_color_comp = Image.alpha_composite(a_out_color, b_out_color)
-        # experiment - only faded the colors - not needed
-        #out_color_comp = lerp_imagemath_RGBA(a_out_color, b_out_color, None, int(np.ceil((max_time * 100)/255)))
-        #out_color_comp.show("out_color_comp")
-        # ensure that the composited images are transparent
+        # ensure that the composited images have transparency
         a_color.putalpha(ImageOps.invert(b_color_alpha))
-        #a_color.show("a_color b_color_alpha")
         final_image = Image.alpha_composite(a_color, out_color_comp)
-        #final_image.show("final image")
-        #print(f"time:{time} maxtime:{max_time} inv-max-time:{255 - max_time} softness: {softness}")
-        #input("Press Enter to continue...")
-    end = timer()
-    print(f"PSLumaWipe2:{end - start} ")
+
+    #end = timer()
+    #print(f"PSLumaWipe2:{end - start} ")
     return final_image.convert("RGBA")
  
 
-def PSLumaWipe_images2(start_image: Image, stop_image: Image, luma_wipe_image: Image, num_frames: int, transition_color: tuple[int, int, int, int] = (255,255,255,255)) -> list:
+def PSLumaWipe_images2(start_image: Image, stop_image: Image, luma_wipe_image: Image, num_frames: int, invert:bool = False, transition_color: tuple[int, int, int, int] = (255,255,255,255)) -> list:
     #progress(0, status='Generating luma wipe...')
     #luma_color = list(np.divide(transition_color,255))    
     softness = 0.095
@@ -900,13 +884,11 @@ def PSLumaWipe_images2(start_image: Image, stop_image: Image, luma_wipe_image: I
     # call PSLumaWipe for each frame
     for i in range(num_frames):
         # Compute the luma value for this frame
-        luma_progress = i / (num_frames - 1)    
-        # initialize the transition image
-        #transition = Image.new("RGBA", (width, height))
+        luma_progress = i / (num_frames - 1)
+
         # call PSLumaWipe for frame
-        transition = PSLumaWipe2(start_image.copy(), stop_image.copy(), luma_wipe_image.copy(), transition_color, luma_progress, False, softness, 0.02, 0.01)                
-        lw_frames.append(transition)        
-        print(f"Luma Wipe frame:{len(lw_frames)} {transition.mode} {transition.size} {luma_progress}")
-        #lw_frames[-1].show()
+        transition = PSLumaWipe2(start_image.copy(), stop_image.copy(), luma_wipe_image.copy(), transition_color, luma_progress, invert, softness, 0.02, 0.01)                
+        lw_frames.append(transition)
+        print(f"Luma Wipe frame:{len(lw_frames)} {transition.size} {luma_progress * 100}%")
     lw_frames.append(stop_image.convert("RGBA"))
     return lw_frames
