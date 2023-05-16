@@ -121,10 +121,15 @@ class InfZoomer:
             print (f"\033[KInfZoom: Upscaling mainframe: {idx}   \r",end="")
             self.main_frames[idx]=do_upscaleImg(mf, self.C.upscale_do, self.C.upscaler_name, self.C.upscale_by)
 
-        self.width  = self.main_frames[0].width
-        self.height = self.main_frames[0].height
         self.mask_width = math.trunc(self.mask_width*self.C.upscale_by)
         self.mask_height = math.trunc(self.mask_height *self.C.upscale_by)
+
+        if self.C.outpaintStrategy == "Corners":
+            self.width  = self.main_frames[0].width-2*self.mask_width 
+            self.height = self.main_frames[0].height-2*self.mask_width
+        else:
+            self.width  = self.main_frames[0].width
+            self.height = self.main_frames[0].height
 
     def prepareInitImage(self) -> Image:
         if self.C.custom_init_image:
@@ -135,7 +140,7 @@ class InfZoomer:
             )
             self.save2Collect(current_image, f"init_custom.png")
         else:
-            load_model_from_setting("infzoom_inpainting_model", self.C.progress, "Loading Model for txt2img: ")
+            load_model_from_setting("infzoom_txt2img_model", self.C.progress, "Loading Model for txt2img: ")
 
             processed, newseed = self.renderFirstFrame()
 
@@ -162,32 +167,14 @@ class InfZoomer:
     def getInitialPrompt(self):
         return self.prompts[min(k for k in self.prompts.keys() if k >= 0)]
     
+
     def outpaint_steps_cornerStrategy(self):
         currentImage = self.main_frames[-1]
 
-        original_width, original_height = currentImage.size
+        masked_image = create_mask_with_circles(currentImage, self.mask_width, 30)
 
-        new_width = original_width + self.mask_width*2
-        new_height = original_height + self.mask_height*2
-        left = right = int(self.mask_width)
-        top = bottom = int(self.mask_height)
-
-        # 512 is here the inpainting size- 512 is native min size even on 2.1 models
-        corners = [
-            (0, 0),  
-            (new_width - 512, 0),  
-            (0, new_height - 512),  
-            (new_width - 512, new_height - 512),  
-        ]
-        masked_images = []
-        
-        white = Image.new("1", (new_width,new_height), 0)
-        for idx, corner in enumerate(corners):
-            white = Image.new("1", (new_width,new_height), 0)
-            draw = ImageDraw.Draw(white)
-            draw.rectangle([corner[0], corner[1], corner[0]+512, corner[1]+512], fill=1) #area of full inpaint
-            draw.rectangle([left, top, left-1+original_width, top-1+original_height], fill=0) #preserve inner org img
-            masked_images.append(white)
+        new_width= masked_image.width
+        new_height=masked_image.height
 
         outpaint_steps=self.C.num_outpainting_steps
         for i in range(outpaint_steps):
@@ -204,29 +191,28 @@ class InfZoomer:
 
                 self.save2Collect(currentImage, self.out_config, f"exit_img.png")
             else:
-                expanded_image = ImageOps.expand(currentImage, (left, top, right, bottom), fill=(0, 0, 0))
+                expanded_image = currentImage.resize((new_width,new_height))
+                expanded_image.paste(currentImage, (self.mask_width,self.mask_height))
                 pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
                 
-                # outpaint 4 corners loop
-                for idx,cornermask in enumerate(masked_images):
-                    processed, newseed = renderImg2Img(
-                        f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
-                        self.C.negative_prompt,
-                        self.C.sampler,
-                        self.C.num_inference_steps,
-                        self.C.guidance_scale,
-                        self.current_seed,
-                        512,  #outpaintsizeW
-                        512,  #outpaintsizeH
-                        expanded_image,
-                        cornermask,
-                        self.C.inpainting_denoising_strength,
-                        self.C.inpainting_mask_blur,
-                        self.C.inpainting_fill_mode,
-                        True, # self.C.inpainting_full_res,
-                        self.C.inpainting_padding,
-                    )
-                    expanded_image = processed.images[0]
+                processed, newseed = renderImg2Img(
+                    f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
+                    self.C.negative_prompt,
+                    self.C.sampler,
+                    self.C.num_inference_steps,
+                    self.C.guidance_scale,
+                    self.current_seed,
+                    new_width,  #outpaintsizeW
+                    new_height,  #outpaintsizeH
+                    expanded_image,
+                    masked_image,
+                    self.C.inpainting_denoising_strength,
+                    self.C.inpainting_mask_blur,
+                    self.C.inpainting_fill_mode,
+                    False, # self.C.inpainting_full_res,
+                    self.C.inpainting_padding,
+                )
+                expanded_image = processed.images[0]
                 #
                 
                 if len(processed.images) > 0:
@@ -296,60 +282,6 @@ class InfZoomer:
                 # TODO: seed behavior
 
         return processed
-
-
-    def outpaint_steps_smallCenter(self):
-
-        # one mask for all steps and outpaints
-        mask_image = np.array(shrink_and_paste_on_blank(
-            self.main_frames[0], self.mask_width+self.C.overmask, self.mask_height+self.C.overmask)
-        )[:, :, 3]
-        mask_image = Image.fromarray(255 - mask_image).convert("RGB")
-
-#       if (self.C.inpainting_fill_mode == 1): # ORIGINAL
-
-        outpaint_steps=self.C.num_outpainting_steps
-
-        for i in range(outpaint_steps):
-            print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(self.current_seed)}")
-            currentImage = self.main_frames[-1]
-
-            if self.C.custom_exit_image and ((i + 1) == outpaint_steps):
-                currentImage = self.C.custom_exit_image.resize(
-                    (self.C.width, self.C.height), resample=Image.LANCZOS
-                )
-                self.main_frames.append(currentImage.convert("RGB"))
-                # print("using Custom Exit Image")
-                self.save2Collect(currentImage, self.out_config, f"exit_img.png")
-            else:
-                smaller_image = shrink_and_paste_on_blank(currentImage,self.mask_width,self.mask_height)
-                pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
-                
-                processed, newseed = renderImg2Img(
-                    f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
-                    self.C.negative_prompt,
-                    self.C.sampler,
-                    self.C.num_inference_steps,
-                    self.C.guidance_scale,
-                    self.current_seed,
-                    512,  #outpaintsizeW
-                    512,  #outpaintsizeH
-                    smaller_image,
-                    mask_image,
-                    1, #inpainting_denoising_strength,
-                    self.C.inpainting_mask_blur,
-                    self.C.inpainting_fill_mode,
-                    True,  # only masked, not full, keep size of expandedimage!
-                    0 #inpainting_padding,
-                )
-                
-                if len(processed.images) > 0:
-                    self.main_frames.append(processed.images[0])
-                    self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
-                seed = newseed
-                # TODO: seed behavior
-        return processed
-
 
     def calculate_interpolation_steps_linear(self, original_size, target_size, steps):
         width, height = original_size
@@ -456,12 +388,12 @@ class InfZoomer:
             raise ValueError("unsupported Zoom mode in INfZoom")
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
-                                            self.cropCenterTo(current_image,(self.width,self.height)),
+                                            self.cropCenterTo(current_image,(self.width-50,self.height-50)),
                                             self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount),
                                             self.C.video_ffmpeg_opts)
 
         outzoomSize = (self.width+self.mask_width*2, self.height+self.mask_height*2)
-        target_size = (self.width, self.height)
+        target_size = (self.width, self.height) # mask border, hide blipping
 
 
         scaling_steps = self.calculate_interpolation_steps_linear(outzoomSize, target_size, self.num_interpol_frames)
@@ -476,7 +408,7 @@ class InfZoomer:
                 current_image = self.main_frames[-1-i]
 
             self.contVW.append([
-                self.cropCenterTo(current_image,(self.width, self.height))
+                self.cropCenterTo(current_image,(self.width-50, self.height-50))
             ])
 
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
@@ -484,7 +416,7 @@ class InfZoomer:
                 print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r",end="")
                 #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
                 scaled_image = current_image.resize(scaling_steps[j], Image.LANCZOS)                    
-                cropped_image = self.cropCenterTo(scaled_image,(self.width, self.height))
+                cropped_image = self.cropCenterTo(scaled_image,(self.width-50, self.height-50))
 
                 self.contVW.append([cropped_image])
 
@@ -649,3 +581,35 @@ class InfZoomer:
             integer_steps.append((new_width, new_height))
 
         return integer_steps
+    
+
+
+def create_mask_with_circles(original_image, border, radius=4):
+
+    # Create a new image with border and draw a mask
+    new_width = original_image.width + 2 * border
+    new_height = original_image.height + 2 * border
+
+    # Create new image, default is black
+    mask = Image.new('RGB', (new_width, new_height), 'white')
+
+    # Draw black rectangle
+    draw = ImageDraw.Draw(mask)
+    draw.rectangle([border, border, new_width - border, new_height - border], fill='black')
+
+    # Coordinates for circles
+    circle_coords = [
+        (border, border),  # Top-left
+        (new_width - border, border),  # Top-right
+        (border, new_height - border),  # Bottom-left
+        (new_width - border, new_height - border),  # Bottom-right
+        (new_width // 2, border),  # Middle-top
+        (new_width // 2, new_height - border),  # Middle-bottom
+        (border, new_height // 2),  # Middle-left
+        (new_width - border, new_height // 2)  # Middle-right
+    ]
+
+    # Draw circles
+    for coord in circle_coords:
+        draw.ellipse([coord[0] - radius, coord[1] - radius, coord[0] + radius, coord[1] + radius], fill='white')
+    return mask
