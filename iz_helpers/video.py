@@ -1,5 +1,6 @@
 import numpy as np
 import imageio
+import subprocess
 from .image import draw_gradient_ellipse, alpha_composite_images, blend_images, PSLumaWipe_images2
 import math
 
@@ -104,3 +105,8 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
                 self._writer.append_data(np.array(frame))
         
             self._writer.close()
+
+def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'ffmpeg'):
+    command = [ffmpeg_location, '-i', video_path, '-i', audio_path, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', output_path]
+    subprocess.run(command)
+    return output_path

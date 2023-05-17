@@ -9,11 +9,11 @@ from .helpers import (
     fix_env_Path_ffprobe,
     closest_upper_divisible_by_eight,
     load_model_from_setting,
-    do_upscaleImg,value_to_bool
+    do_upscaleImg,value_to_bool, find_ffmpeg_binary
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
 from .image import shrink_and_paste_on_blank, open_image, apply_alpha_mask, draw_gradient_ellipse, resize_and_crop_image, crop_fethear_ellipse, crop_inner_image
-from .video import write_video
+from .video import write_video, add_audio_to_video
 
 def outpaint_steps(
     width,
@@ -41,7 +41,7 @@ def outpaint_steps(
     mask_height,
     custom_exit_image,
     frame_correction=True,  # TODO: add frame_Correction in UI
-    blend_gradient_size = 61,
+    blend_gradient_size = 61
 ):
     main_frames = [init_img.convert("RGBA")]
     prev_image = init_img.convert("RGBA")
@@ -87,7 +87,7 @@ def outpaint_steps(
                     f"{common_prompt_pre}\n{pr}\n{common_prompt_suf}".strip(),
                     negative_prompt,
                     sampler,
-                    num_inference_steps,
+                    int(num_inference_steps),
                     guidance_scale,
                     seed,
                     width,
@@ -209,10 +209,11 @@ def create_zoom(
     blend_gradient_size,
     blend_invert_do,
     blend_color,
+    audio_filename=None,
     inpainting_denoising_strength=1,
     inpainting_full_res=0,
     inpainting_padding=0,
-    progress=None,
+    progress=None,    
 ):
     for i in range(batchcount):
         print(f"Batch {i+1}/{batchcount}")
@@ -223,7 +224,7 @@ def create_zoom(
             negative_prompt,
             num_outpainting_steps,
             guidance_scale,
-            num_inference_steps,
+            int(num_inference_steps),
             custom_init_image,
             custom_exit_image,
             video_frame_rate,
@@ -249,6 +250,7 @@ def create_zoom(
             inpainting_full_res,
             inpainting_padding,
             progress,
+            audio_filename
         )
     return result
 
@@ -325,6 +327,7 @@ def create_zoom_single(
     inpainting_full_res,
     inpainting_padding,
     progress,
+    audio_filename = None
 ):
     # try:
     #     if gr.Progress() is not None:
@@ -429,7 +432,7 @@ def create_zoom_single(
         negative_prompt,
         current_seed,
         sampler,
-        num_inference_steps,
+        int(num_inference_steps),
         guidance_scale,
         inpainting_denoising_strength,
         inpainting_mask_blur,
@@ -443,7 +446,7 @@ def create_zoom_single(
         mask_height,
         custom_exit_image,
         False,
-        blend_gradient_size,
+        blend_gradient_size
     )
 
     #for k in range(len(main_frames)):
@@ -551,6 +554,9 @@ def create_zoom_single(
         blend_gradient_size,
         ImageColor.getcolor(blend_color, "RGBA"),
     )
+    if audio_filename is not None:
+        out_config["video_filename"] = add_audio_to_video(out_config["video_filename"], audio_filename, str.replace(out_config["video_filename"], ".mp4", "_audio.mp4"), find_ffmpeg_binary())
+
     print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
     return (
         out_config["video_filename"],

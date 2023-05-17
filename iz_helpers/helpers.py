@@ -4,6 +4,7 @@ import modules.shared as shared
 import modules.sd_models
 import gradio as gr
 from scripts import postprocessing_upscale
+from pkg_resources import resource_filename
 from .prompt_util import readJsonPrompt, process_keys
 from .static_variables import jsonprompt_schemafile
 import asyncio
@@ -141,3 +142,18 @@ def value_to_bool(value):
         if value in (0, 1):
             return bool(value)
     return False
+
+def find_ffmpeg_binary():
+    try:
+        import google.colab
+        return 'ffmpeg'
+    except:
+        pass
+    for package in ['imageio_ffmpeg', 'imageio-ffmpeg']:
+        try:
+            package_path = resource_filename(package, 'binaries')
+            files = [os.path.join(package_path, f) for f in os.listdir(package_path) if f.startswith("ffmpeg-")]
+            files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+            return files[0] if files else 'ffmpeg'
+        except:
+            return 'ffmpeg'
