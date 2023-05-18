@@ -13,7 +13,8 @@ infzoom_titles = {
     "Custom exit image":"An image at the end resp. begin of your movie, depending or ZoomIn or Out",
     "Zoom Speed":"Varies additional frames per second",
     "Start at second [0,1,...]": "At which time the prompt has to be occure. We need at least one prompt starting at time 0",
-	"Generate video": "Start rendering. If it´s disabled the prompt table is invalid, check we have a start prompt at time 0"
+	"Generate video": "Start rendering. If it´s disabled the prompt table is invalid, check we have a start prompt at time 0",
+	"Audio File Name": "File used to mix audio over the video. The shorter of the two (audio, video) length is used"
 }
 
 

@@ -24,12 +24,14 @@ default_prompt = """
         ]
     },
     "postPrompt": "epic perspective,(vegetation overgrowth:1.3)(intricate, ornamentation:1.1),(baroque:1.1), fantasy, (realistic:1) digital painting , (magical,mystical:1.2) , (wide angle shot:1.4), (landscape composed:1.2)(medieval:1.1),(tropical forest:1.4),(river:1.3) volumetric lighting ,epic, style by Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2)",
-    "negPrompt": "frames, border, edges, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur, bad-artist"
+    "negPrompt": "frames, border, edges, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur, bad-artist",
+    "audioFileName": None,
+    "seed":-1
 }
 """
 
 empty_prompt = (
-    '{"prompts":{"data":[0,"","","",false],"headers":["Outpaintg Steps","prompt","image location", "blend mask location", "is keyframe"]},"negPrompt":"", prePrompt:"", postPrompt:""}'
+    '{"prompts":{"data":[0,"","","",false],"headers":["Outpaintg Steps","prompt","image location", "blend mask location", "is keyframe"]},"negPrompt":"", "prePrompt":"", "postPrompt":"", "audioFileName":None, "seed":-1}'
 )
 
 invalid_prompt = {
@@ -40,6 +42,8 @@ invalid_prompt = {
     "negPrompt": "Invalid prompt-json",
     "prePrompt": "Invalid prompt",
     "postPrompt": "Invalid prompt",
+    "audioFileName": None,
+    "seed":-1
 }
 
 available_samplers = [

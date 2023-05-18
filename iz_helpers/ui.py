@@ -24,6 +24,9 @@ from .static_variables import promptTableHeaders
 
 
 def on_ui_tabs():
+    main_seed = gr.Number()
+    audio_filename = gr.Textbox(None)
+
     with gr.Blocks(analytics_enabled=False) as infinite_zoom_interface:
         gr.HTML(
             """
@@ -85,63 +88,14 @@ def on_ui_tabs():
                         value=jpr["negPrompt"], label="Negative Prompt"
                     )
 
-                    # these button will be moved using JS under the dataframe view as small ones
-                    exportPrompts_button = gr.Button(
-                        value="Export prompts",
-                        variant="secondary",
-                        elem_classes="sm infzoom_tab_butt",
-                        elem_id="infzoom_exP_butt",
-                    )
-                    importPrompts_button = gr.UploadButton(
-                        label="Import prompts",
-                        variant="secondary",
-                        elem_classes="sm infzoom_tab_butt",
-                        elem_id="infzoom_imP_butt",
-                    )
-                    exportPrompts_button.click(
-                        None,
-                        _js="exportPrompts",
-                        inputs=[
-                            main_common_prompt_pre,
-                            main_prompts,
-                            main_common_prompt_suf,
-                            main_negative_prompt,
-                        ],
-                        outputs=None,
-                    )
-                    importPrompts_button.upload(
-                        fn=putPrompts,
-                        outputs=[
-                            main_common_prompt_pre,
-                            main_prompts,
-                            main_common_prompt_suf,
-                            main_negative_prompt,
-                            main_outpaint_steps,
-                        ],
-                        inputs=[importPrompts_button],
-                    )
-
-                    clearPrompts_button = gr.Button(
-                        value="Clear prompts",
-                        variant="secondary",
-                        elem_classes="sm infzoom_tab_butt",
-                        elem_id="infzoom_clP_butt",
-                    )
-                    clearPrompts_button.click(
-                        fn=clearPrompts,
-                        inputs=[],
-                        outputs=[
-                            main_prompts,
-                            main_negative_prompt,
-                            main_common_prompt_pre,
-                            main_common_prompt_suf,
-                        ],
-                    )
-
                     with gr.Accordion("Render settings"):
                         with gr.Row():
-                            seed = gr.Number(
-                                label="Seed", value=-1, precision=0, interactive=True
+                            main_seed = gr.Number(
+                                label="Seed", 
+                                value=jpr["seed"],
+                                elem_id="infzoom_main_seed",
+                                precision=0, 
+                                interactive=True
                             )
                             main_sampler = gr.Dropdown(
                                 label="Sampler",
@@ -256,7 +210,10 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
 
                 with gr.Tab("Audio"):
                     with gr.Row():
-                        audio_filename = gr.Textbox(value=None, label="Audio File Name")
+                        audio_filename = gr.Textbox(
+                            value=jpr["audioFileName"], 
+                            label="Audio File Name",
+                            elem_id="infzoom_audioFileName")
                         audio_file = gr.File(
                             value=None,
                             file_count="single",
@@ -303,6 +260,66 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
 """
                         )
 
+
+                # these buttons will be moved using JS under the dataframe view as small ones
+                exportPrompts_button = gr.Button(
+                    value="Export prompts",
+                    variant="secondary",
+                    elem_classes="sm infzoom_tab_butt",
+                    elem_id="infzoom_exP_butt",
+                )
+                importPrompts_button = gr.UploadButton(
+                    label="Import prompts",
+                    variant="secondary",
+                    elem_classes="sm infzoom_tab_butt",
+                    elem_id="infzoom_imP_butt",
+                )
+                exportPrompts_button.click(
+                    None,
+                    _js="exportPrompts",
+                    inputs=[
+                        main_common_prompt_pre,
+                        main_prompts,
+                        main_common_prompt_suf,
+                        main_negative_prompt,
+                        audio_filename,
+                        main_seed
+                    ],
+                    outputs=None,
+                )
+                importPrompts_button.upload(
+                    fn=putPrompts,
+                    outputs=[
+                        main_common_prompt_pre,
+                        main_prompts,
+                        main_common_prompt_suf,
+                        main_negative_prompt,
+                        main_outpaint_steps,
+                        audio_filename,
+                        main_seed
+                    ],
+                    inputs=[importPrompts_button],
+                )
+
+                clearPrompts_button = gr.Button(
+                    value="Clear prompts",
+                    variant="secondary",
+                    elem_classes="sm infzoom_tab_butt",
+                    elem_id="infzoom_clP_butt",
+                )
+                clearPrompts_button.click(
+                    fn=clearPrompts,
+                    inputs=[],
+                    outputs=[
+                        main_prompts,
+                        main_negative_prompt,
+                        main_common_prompt_pre,
+                        main_common_prompt_suf,
+                        audio_filename,
+                        main_seed
+                    ],
+                )
+
             with gr.Column(scale=1, variant="compact"):
                 output_video = gr.Video(label="Output").style(width=512, height=512)
                 (
@@ -333,7 +350,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 inpainting_mask_blur,
                 inpainting_fill_mode,
                 video_zoom_speed,
-                seed,
+                main_seed,
                 main_width,
                 main_height,
                 batchcount_slider,

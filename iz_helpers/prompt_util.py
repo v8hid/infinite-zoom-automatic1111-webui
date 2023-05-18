@@ -40,6 +40,11 @@ def completeOptionals(j):
             else:
                 j["postPrompt"]=""
 
+        if "audioFileName" not in j:
+                j["audioFileName"]= None
+
+        if "seed" not in j:
+                j["seed"]= -1
     return j
 
 def validatePromptJson_throws(data):

@@ -112,6 +112,8 @@ def putPrompts(files):
                 gr.Textbox.update(data["postPrompt"]),
                 gr.Textbox.update(data["negPrompt"]),
                 gr.Slider.update(value=prompts_keys[0]),
+                gr.Textbox.update(data["audioFileName"]),
+                gr.Number.update(data["seed"])
             ]
 
     except Exception:
@@ -121,7 +123,7 @@ def putPrompts(files):
         # error only be shown with raise, so ui gets broken.
         #asyncio.run(showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5))
 
-        return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update()]
+        return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update(),gr.Textbox.update(),gr.Number.update()]
 
 
 def clearPrompts():
@@ -129,7 +131,9 @@ def clearPrompts():
         gr.DataFrame.update(value=[[0, "Infinite Zoom. Start over"]]),
         gr.Textbox.update(""),
         gr.Textbox.update(""),
-        gr.Textbox.update("")
+        gr.Textbox.update(""),
+        gr.Textbox.update(None),
+        gr.Number.update(-1),
     ]
 
 def value_to_bool(value):
