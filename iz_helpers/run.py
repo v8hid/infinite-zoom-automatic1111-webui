@@ -39,13 +39,23 @@ class InfZoomer:
         fix_env_Path_ffprobe()
         self.out_config = self.prepare_output_path()
 
+        self.current_seed = self.C.seed
+
+        # knowing the mask_height and desired outputsize find a compromise due to align 8 contraint of diffuser
         self.width = closest_upper_divisible_by_eight(self.C.outputsizeW)
         self.height = closest_upper_divisible_by_eight(self.C.outputsizeH)
 
-        self.current_seed = self.C.seed
+        if self.width > self.height:
+            self.mask_width  = self.C.outpaint_amount_px  # was initially 512px => 128px
+            self.mask_height = math.trunc(self.C.outpaint_amount_px * self.height/self.width)  # was initially 512px => 128px
+        else:
+            self.mask_height  = self.C.outpaint_amount_px  # was initially 512px => 128px
+            self.mask_width  = math.trunc(self.C.outpaint_amount_px * self.width/self.height)  # was initially 512px => 128px
 
-        self.mask_width  = self.C.outpaint_amount_px  # was initially 512px => 128px
-        self.mask_height = self.C.outpaint_amount_px  # was initially 512px => 128px
+        # here we leave slightly the desired ratio since if size+mask_size % 8 != 0
+        self.mask_width += (self.mask_width+self.width) % 8
+        self.mask_height += (self.mask_height+self.height) % 8
+        print (f"Adapted sizes for diffusers to: {self.width}x{self.height}+mask:{self.mask_width}x{self.mask_height}. New ratio: {(self.width+self.mask_width)/(self.height+self.mask_height)} ")
 
         self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed)
 
@@ -126,7 +136,7 @@ class InfZoomer:
 
         if self.C.outpaintStrategy == "Corners":
             self.width  = self.main_frames[0].width-2*self.mask_width 
-            self.height = self.main_frames[0].height-2*self.mask_width
+            self.height = self.main_frames[0].height-2*self.mask_height
         else:
             self.width  = self.main_frames[0].width
             self.height = self.main_frames[0].height
@@ -171,7 +181,7 @@ class InfZoomer:
     def outpaint_steps_cornerStrategy(self):
         currentImage = self.main_frames[-1]
 
-        masked_image = create_mask_with_circles(currentImage, self.mask_width, 30)
+        masked_image = create_mask_with_circles(currentImage, self.mask_width, self.mask_height, 30)
 
         new_width= masked_image.width
         new_height=masked_image.height
@@ -201,7 +211,7 @@ class InfZoomer:
                     self.C.sampler,
                     self.C.num_inference_steps,
                     self.C.guidance_scale,
-                    self.current_seed,
+                    -1, # try to avoid massive repeatings: self.current_seed,
                     new_width,  #outpaintsizeW
                     new_height,  #outpaintsizeH
                     expanded_image,
@@ -297,86 +307,6 @@ class InfZoomer:
 
         return scaling_steps
 
-
-    def calculate_interpolation_steps_goldenratio(self,original_size, target_size, steps):
-        width, height = original_size
-        target_width, target_height = target_size
-        golden_ratio = (1 + 5 ** 0.5) / 2 - 1  # Approx. 0.618
-
-        if width <= 0 or height <= 0 or target_width <= 0 or target_height <= 0 or steps <= 0:
-            return None
-
-        original_ratio = width / height
-        scaling_steps = []
-        for i in range(1, steps + 1):
-            t = i / steps
-            factor = 1 - golden_ratio * t
-            new_width = width * factor + target_width * (1 - factor)
-            new_height = height * factor + target_height * (1 - factor)
-
-            floor_width, ceil_width = int(new_width // 1), int(new_width // 1 + 1)
-            floor_height, ceil_height = int(new_height // 1), int(new_height // 1 + 1)
-
-            floor_ratio = floor_width / floor_height
-            ceil_ratio = ceil_width / ceil_height
-
-            if abs(floor_ratio - original_ratio) < abs(ceil_ratio - original_ratio):
-                new_width, new_height = floor_width, floor_height
-            else:
-                new_width, new_height = ceil_width, ceil_height
-
-            scaling_steps.append((new_width, new_height))
-
-        return scaling_steps
-
-
-    def calculate_interpolation_steps_log(self, original_size, target_size, steps):
-        width, height = original_size
-        target_width, target_height = target_size
-
-        if width <= 0 or height <= 0 or target_width <= 0 or target_height <= 0 or steps <= 0:
-            return None
-
-        original_ratio = width / height
-        scaling_steps = []
-        
-        log_w_ratio = math.log(target_width / width) / steps
-        log_h_ratio = math.log(target_height / height) / steps
-
-        for i in range(1, steps):
-            new_width = width * math.exp(i * log_w_ratio)
-            new_height = height * math.exp(i * log_h_ratio)
-
-            floor_width, ceil_width = int(new_width // 1), int(new_width // 1 + 1)
-            floor_height, ceil_height = int(new_height // 1), int(new_height // 1 + 1)
-
-            floor_ratio = floor_width / floor_height
-            ceil_ratio = ceil_width / ceil_height
-
-            if abs(floor_ratio - original_ratio) < abs(ceil_ratio - original_ratio):
-                new_width, new_height = floor_width, floor_height
-            else:
-                new_width, new_height = ceil_width, ceil_height
-
-            scaling_steps.append((new_width, new_height))
-
-        # Add the last step that is one pixel away from the target size
-        scaling_steps.append((target_width - 1, target_height - 1))
-
-        return scaling_steps
-
-
-    def calculate_interpolation_steps_exponential(self, original_size, target_size, steps,exponent=2):
-        width, height = original_size
-        target_width, target_height = target_size
-        scaling_steps = []
-        for i in range(1, steps + 1):
-            t = i / steps
-            factor = (1 - t) + t * (math.pow(t, exponent - 1))
-            new_width = width * (1 - factor) + target_width * factor
-            new_height = height * (1 - factor) + target_height * factor
-            scaling_steps.append((math.floor(new_width), math.floor(new_height)))
-        return scaling_steps
    
     def interpolateFramesOuterZoom(self):
 
@@ -388,7 +318,7 @@ class InfZoomer:
             raise ValueError("unsupported Zoom mode in INfZoom")
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
-                                            self.cropCenterTo(current_image,(self.width-50,self.height-50)),
+                                            self.cropCenterTo(current_image,(self.width,self.height)),
                                             self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount),
                                             self.C.video_ffmpeg_opts)
 
@@ -399,8 +329,13 @@ class InfZoomer:
         scaling_steps = self.calculate_interpolation_steps_linear(outzoomSize, target_size, self.num_interpol_frames)
         print(f"Before: {scaling_steps}, length: {len(scaling_steps)}")
         scaling_steps = self.apply_savitzky_golay_filter(scaling_steps,self.width/self.height)
+        for s in scaling_steps:
+            print(f"Ratio: {str(s[0]/s[1])}")     
+
         print(f"After: {scaling_steps}, length: {len(scaling_steps)}")
-        
+        for s in scaling_steps:
+            print(f"Ratio: {str(s[0]/s[1])}")     
+
         for i in range(len(self.main_frames)):
             if 0 == self.C.video_zoom_mode:
                 current_image = self.main_frames[0+i]
@@ -408,7 +343,7 @@ class InfZoomer:
                 current_image = self.main_frames[-1-i]
 
             self.contVW.append([
-                self.cropCenterTo(current_image,(self.width-50, self.height-50))
+                self.cropCenterTo(current_image,(self.width, self.height))
             ])
 
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
@@ -416,7 +351,7 @@ class InfZoomer:
                 print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r",end="")
                 #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
                 scaled_image = current_image.resize(scaling_steps[j], Image.LANCZOS)                    
-                cropped_image = self.cropCenterTo(scaled_image,(self.width-50, self.height-50))
+                cropped_image = self.cropCenterTo(scaled_image,(self.width, self.height))
 
                 self.contVW.append([cropped_image])
 
@@ -584,29 +519,28 @@ class InfZoomer:
     
 
 
-def create_mask_with_circles(original_image, border, radius=4):
-
+def create_mask_with_circles(original_image, border_width, border_height, radius=4):
     # Create a new image with border and draw a mask
-    new_width = original_image.width + 2 * border
-    new_height = original_image.height + 2 * border
+    new_width = original_image.width + 2 * border_width
+    new_height = original_image.height + 2 * border_height
 
     # Create new image, default is black
     mask = Image.new('RGB', (new_width, new_height), 'white')
 
     # Draw black rectangle
     draw = ImageDraw.Draw(mask)
-    draw.rectangle([border, border, new_width - border, new_height - border], fill='black')
+    draw.rectangle([border_width, border_height, new_width - border_width, new_height - border_height], fill='black')
 
     # Coordinates for circles
     circle_coords = [
-        (border, border),  # Top-left
-        (new_width - border, border),  # Top-right
-        (border, new_height - border),  # Bottom-left
-        (new_width - border, new_height - border),  # Bottom-right
-        (new_width // 2, border),  # Middle-top
-        (new_width // 2, new_height - border),  # Middle-bottom
-        (border, new_height // 2),  # Middle-left
-        (new_width - border, new_height // 2)  # Middle-right
+        (border_width, border_height),  # Top-left
+        (new_width - border_width, border_height),  # Top-right
+        (border_width, new_height - border_height),  # Bottom-left
+        (new_width - border_width, new_height - border_height),  # Bottom-right
+        (new_width // 2, border_height),  # Middle-top
+        (new_width // 2, new_height - border_height),  # Middle-bottom
+        (border_width, new_height // 2),  # Middle-left
+        (new_width - border_width, new_height // 2)  # Middle-right
     ]
 
     # Draw circles
