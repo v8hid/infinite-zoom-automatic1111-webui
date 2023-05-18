@@ -147,8 +147,11 @@ class InfZoomer:
         if self.C.custom_init_image:
             current_image = Image.new(mode="RGBA", size=(self.width, self.height))
             current_image = current_image.convert("RGB")
-            current_image = self.C.custom_init_image.resize(
-                (self.width, self.height), resample=Image.LANCZOS
+            current_image = cv2_to_pil(cv2.resize(
+                    pil_to_cv2(self.C.custom_init_image),
+                    (self.width, self.height),
+                    interpolation=cv2.INTER_AREA            
+                )
             )
             self.save2Collect(current_image, f"init_custom.png")
         else:
@@ -194,8 +197,11 @@ class InfZoomer:
             currentImage = self.main_frames[-1]
 
             if self.C.custom_exit_image and ((i + 1) == outpaint_steps):
-                currentImage = self.C.custom_exit_image.resize(
-                    (self.C.width, self.C.height), resample=Image.LANCZOS
+                currentImage = cv2_to_pil(cv2.resize(
+                    pil_to_cv2(self.C.custom_exit_image),
+                    (self.C.width, self.C.height), 
+                    interpolation=cv2.INTER_AREA
+                    )
                 )
                 
                 if 0 == self.outerZoom:
@@ -203,7 +209,13 @@ class InfZoomer:
 
                 self.save2Collect(currentImage, self.out_config, f"exit_img.png")
             else:
-                expanded_image = currentImage.resize((new_width,new_height))
+                expanded_image = cv2_to_pil(
+                    cv2.resize(pil_to_cv2(currentImage),
+                             (new_width,new_height),
+                             interpolation=cv2.INTER_AREA
+                    )
+                )
+
                 #expanded_image = Image.new("RGB",(new_width,new_height),"black")
                 expanded_image.paste(currentImage, (self.mask_width,self.mask_height))
                 pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
@@ -229,8 +241,13 @@ class InfZoomer:
                 #
                 
                 if len(processed.images) > 0:
-                    zoomed_img = expanded_image.resize((self.width,self.height), Image.Resampling.LANCZOS)
-
+                    zoomed_img = cv2_to_pil(cv2.resize(
+                        pil_to_cv2(expanded_image),
+                        (self.width,self.height), 
+                        interpolation=cv2.INTER_AREA
+                        )
+                    )
+                        
                     if self.outerZoom:
                         self.main_frames[-1] = expanded_image # replace small image
                         processed.images[0]=expanded_image    # display overscaned image in gallery
@@ -240,7 +257,12 @@ class InfZoomer:
                             self.main_frames.append(zoomed_img)   # prepare next frame with former content
 
                     else:
-                        zoomed_img = expanded_image.resize((self.width,self.height), Image.Resampling.LANCZOS)
+                        zoomed_img = cv2_to_pil(cv2.resize(
+                                expanded_image,
+                                (self.width,self.height),
+                                interpolation=cv2.INTER_AREA
+                            )
+                        )
                         self.main_frames.append(zoomed_img)
                         processed.images[0]=self.main_frames[-1]
                         self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
@@ -262,9 +284,13 @@ class InfZoomer:
             mask_image = Image.fromarray(255 - mask_image).convert("RGB")
 
             if self.C.custom_exit_image and ((i + 1) == self.C.num_outpainting_steps):
-                current_image = self.C.custom_exit_image.resize(
-                    (self.width, self.height), resample=Image.LANCZOS
+                current_image = cv2_to_pil(
+                    cv2.resize( pil_to_cv2(
+                        self.C.custom_exit_image),
+                        (self.width, self.height), 
+                        interpolation=cv2.INTER_AREA)
                 )
+                
                 self.main_frames.append(current_image.convert("RGB"))
                 # print("using Custom Exit Image")
                 self.save2Collect(current_image, f"exit_img.png")
