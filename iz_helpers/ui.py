@@ -218,11 +218,15 @@ def on_ui_tabs():
                     with gr.Accordion("FFMPEG Expert", open=False):
                         gr.Markdown(
                             """# I need FFMPEG control
-You can put CLI options here as documented https://ffmpeg.org/ffmpeg.html#Options  
+You can put CLI options here as documented <a href='https://ffmpeg.org/ffmpeg.html#Options'>FFMPEG OPTIONS</a> and <a href='https://ffmpeg.org/ffmpeg-filters.html'>FILTER OPTIONS</a>
 
 ## Examples:
-* ```-vf scale=320:240 ``` scales your video to 320x240
+* ```-vf crop=200:200```  crop down to 200x200 pixel from center (useful to cutoff jumpy borders)
+* ```-vf scale=320:240```  scales your video to 320x240
 * ```-c:v libx264 -preset veryslow -qp 0``` uses lossless compression
+
+You might give multiple options in one line.
+
 """
 )
                         video_ffmpeg_opts=gr.Textbox(
@@ -284,9 +288,8 @@ You can put CLI options here as documented https://ffmpeg.org/ffmpeg.html#Option
                     )
                     with gr.Accordion("Help", open=False):
                         gr.Markdown(
-                            """# Performance critical
-Depending on amount of frames and which upscaler you choose it might took a long time to render.  
-Our best experience and trade-off is the R-ERSGAn4x upscaler.
+                            """# Performance warning
+Each step (aka prompt from the table) will be upscaled. Afterwards the zooming will be interpolated on upscaled images. It can take much VRAM, RAM and CPU"
 """
                         )
 

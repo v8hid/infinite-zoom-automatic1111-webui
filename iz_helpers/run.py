@@ -333,11 +333,21 @@ class InfZoomer:
         print(f"Before: {scaling_steps}, length: {len(scaling_steps)}")
         scaling_steps = self.apply_savitzky_golay_filter(scaling_steps,self.width/self.height)
         for s in scaling_steps:
-            print(f"Ratio: {str(s[0]/s[1])}")     
+            print(f"Ratios: {str(s[0]/s[1])}",end=";")     
 
-        print(f"After: {scaling_steps}, length: {len(scaling_steps)}")
+        print(f"After SAVGOL: {scaling_steps}, length: {len(scaling_steps)}")
         for s in scaling_steps:
-            print(f"Ratio: {str(s[0]/s[1])}")     
+            print(f"Ratios: {str(s[0]/s[1])}",end=";")     
+
+
+        # all sizes EVEN
+        for i,s in enumerate(scaling_steps):
+            scaling_steps[i] = (s[0]+s[0]%2, s[1]+s[1]%2)
+
+        print(f"After EVEN: {scaling_steps}, length: {len(scaling_steps)}")
+        for s in scaling_steps:
+            print(f"Ratios: {str(s[0]/s[1])}",end=";")     
+
 
 
 
@@ -354,7 +364,7 @@ class InfZoomer:
             for j in range(self.num_interpol_frames - 1):
                 print(f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r", end="")
                 new_width, new_height = scaling_steps[j]
-                resized_image = cv2.resize(cv2_image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+                resized_image = cv2.resize(cv2_image, (new_width, new_height), interpolation=cv2.INTER_AREA) #INTER_LANCZOS4
                 cropped_image_cv2 = crop_center(resized_image, self.width, self.height)
 
                 # Convert the cropped image back to PIL format
@@ -362,7 +372,7 @@ class InfZoomer:
                 
                 self.contVW.append([cropped_image_pil])
 
-        """
+        """ USING PIL:
         for i in range(len(self.main_frames)):
             if 0 == self.C.video_zoom_mode:
                 current_image = self.main_frames[0+i]
