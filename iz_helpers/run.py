@@ -3,6 +3,8 @@ import numpy as np
 from scipy.signal import savgol_filter
 from typing import Callable, Any
 from PIL import Image, ImageFilter, ImageOps, ImageDraw
+import numpy as np
+import cv2
 
 from modules.ui import plaintext_to_html
 import modules.shared as shared
@@ -202,6 +204,7 @@ class InfZoomer:
                 self.save2Collect(currentImage, self.out_config, f"exit_img.png")
             else:
                 expanded_image = currentImage.resize((new_width,new_height))
+                #expanded_image = Image.new("RGB",(new_width,new_height),"black")
                 expanded_image.paste(currentImage, (self.mask_width,self.mask_height))
                 pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
                 
@@ -220,7 +223,7 @@ class InfZoomer:
                     self.C.inpainting_mask_blur,
                     self.C.inpainting_fill_mode,
                     False, # self.C.inpainting_full_res,
-                    self.C.inpainting_padding,
+                    32 #self.C.inpainting_padding,
                 )
                 expanded_image = processed.images[0]
                 #
@@ -304,7 +307,7 @@ class InfZoomer:
         height_step = (height - target_height) / steps
 
         scaling_steps = [(round(width - i * width_step), round(height - i * height_step)) for i in range(1,steps)]
-
+        scaling_steps.insert(0,original_size) # initial size is in the list
         return scaling_steps
 
    
@@ -336,6 +339,30 @@ class InfZoomer:
         for s in scaling_steps:
             print(f"Ratio: {str(s[0]/s[1])}")     
 
+
+
+        for i in range(len(self.main_frames)):
+            if 0 == self.C.video_zoom_mode:
+                current_image = self.main_frames[0+i]
+            else:
+                current_image = self.main_frames[-1-i]
+
+            # Convert PIL image to OpenCV format
+            cv2_image = pil_to_cv2(current_image)
+
+            # Resize and crop using OpenCV
+            for j in range(self.num_interpol_frames - 1):
+                print(f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r", end="")
+                new_width, new_height = scaling_steps[j]
+                resized_image = cv2.resize(cv2_image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+                cropped_image_cv2 = crop_center(resized_image, self.width, self.height)
+
+                # Convert the cropped image back to PIL format
+                cropped_image_pil = cv2_to_pil(cropped_image_cv2)
+                
+                self.contVW.append([cropped_image_pil])
+
+        """
         for i in range(len(self.main_frames)):
             if 0 == self.C.video_zoom_mode:
                 current_image = self.main_frames[0+i]
@@ -354,7 +381,7 @@ class InfZoomer:
                 cropped_image = self.cropCenterTo(scaled_image,(self.width, self.height))
 
                 self.contVW.append([cropped_image])
-
+        """
 
     def interpolateFramesSmallCenter(self):
 
@@ -519,7 +546,7 @@ class InfZoomer:
     
 
 
-def create_mask_with_circles(original_image, border_width, border_height, radius=4):
+def create_mask_with_circles(original_image, border_width, border_height, overmask: int, radius=4):
     # Create a new image with border and draw a mask
     new_width = original_image.width + 2 * border_width
     new_height = original_image.height + 2 * border_height
@@ -529,7 +556,7 @@ def create_mask_with_circles(original_image, border_width, border_height, radius
 
     # Draw black rectangle
     draw = ImageDraw.Draw(mask)
-    draw.rectangle([border_width, border_height, new_width - border_width, new_height - border_height], fill='black')
+    draw.rectangle([border_width+overmask, border_height+overmask, new_width - border_width-overmask, new_height - border_height-overmask], fill='black')
 
     # Coordinates for circles
     circle_coords = [
@@ -547,3 +574,19 @@ def create_mask_with_circles(original_image, border_width, border_height, radius
     for coord in circle_coords:
         draw.ellipse([coord[0] - radius, coord[1] - radius, coord[0] + radius, coord[1] + radius], fill='white')
     return mask
+
+
+
+
+
+def pil_to_cv2(image):
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+
+def cv2_to_pil(image):
+    return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+def crop_center(img,cropx,cropy):
+    y,x = img.shape[:2]
+    startx = x//2-(cropx//2)
+    starty = y//2-(cropy//2)    
+    return img[starty:starty+cropy,startx:startx+cropx]
