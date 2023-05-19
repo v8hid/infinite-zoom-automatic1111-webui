@@ -195,7 +195,7 @@ def on_ui_tabs():
                         label="number of start frame dupe",
                         info="Frames to freeze at the start of the video",
                         value=0,
-                        minimum=1,
+                        minimum=0,
                         maximum=60,
                         step=1
                     )
@@ -203,7 +203,7 @@ def on_ui_tabs():
                         label="number of last frame dupe",
                         info="Frames to freeze at the end of the video",
                         value=0,
-                        minimum=1,
+                        minimum=0,
                         maximum=60,
                         step=1
                     )

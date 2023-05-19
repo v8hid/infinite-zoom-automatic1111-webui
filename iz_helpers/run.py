@@ -1,8 +1,8 @@
 import math, time, os
 import numpy as np
 from scipy.signal import savgol_filter
-from typing import Callable, Any
-from PIL import Image, ImageFilter, ImageOps, ImageDraw
+from typing import Callable
+from PIL import Image, ImageDraw
 import numpy as np
 import cv2
 
@@ -48,18 +48,24 @@ class InfZoomer:
         self.height = closest_upper_divisible_by_eight(self.C.outputsizeH)
 
         if self.width > self.height:
-            self.mask_width  = self.C.outpaint_amount_px  # was initially 512px => 128px
-            self.mask_height = math.trunc(self.C.outpaint_amount_px * self.height/self.width)  # was initially 512px => 128px
+            self.mask_width  = self.C.outpaint_amount_px 
+            self.mask_height = math.trunc(self.C.outpaint_amount_px * self.height/self.width)  
         else:
-            self.mask_height  = self.C.outpaint_amount_px  # was initially 512px => 128px
-            self.mask_width  = math.trunc(self.C.outpaint_amount_px * self.width/self.height)  # was initially 512px => 128px
+            self.mask_height  = self.C.outpaint_amount_px  
+            self.mask_width  = math.trunc(self.C.outpaint_amount_px * self.width/self.height)  
 
-        # here we leave slightly the desired ratio since if size+mask_size % 8 != 0
-        self.mask_width += (self.mask_width+self.width) % 8
-        self.mask_height += (self.mask_height+self.height) % 8
+        # here we leave slightly the desired ratio since if size+2*mask_size % 8 != 0
+        # distribute "aligning pixels" to the mask size equally. 
+        # only consider mask_size since image size is alread 8-aligned
+        self.mask_width -= self.mask_width % 4
+        self.mask_height -= self.mask_height % 4
+
+        assert 0 == (2*self.mask_width+self.width) % 8
+        assert 0 == (2*self.mask_height+self.height) % 8
+
         print (f"Adapted sizes for diffusers to: {self.width}x{self.height}+mask:{self.mask_width}x{self.mask_height}. New ratio: {(self.width+self.mask_width)/(self.height+self.mask_height)} ")
 
-        self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed)
+        self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed) - 1 # keyframe not to be interpolated
 
         if (self.C.outpaintStrategy == "Corners"):
             self.fnOutpaintMainFrames = self.outpaint_steps_cornerStrategy
@@ -115,8 +121,6 @@ class InfZoomer:
             )
         
         self.fnInterpolateFrames() # changes main_frame and writes to video
-
-        self.contVW.finish(self.main_frames[-1],int(self.C.video_last_frame_dupe_amount))
 
         print("Video saved in: " + os.path.join(script_path, self.out_config["video_filename"]))
 
@@ -186,7 +190,8 @@ class InfZoomer:
     def outpaint_steps_cornerStrategy(self):
         currentImage = self.main_frames[-1]
 
-        masked_image = create_mask_with_circles(currentImage, self.mask_width, self.mask_height, 30)
+        # just 30 radius to get inpaint connected between outer and innter motive
+        masked_image = create_mask_with_circles(currentImage, self.mask_width, self.mask_height, overmask=self.C.overmask, radius=4)
 
         new_width= masked_image.width
         new_height=masked_image.height
@@ -235,12 +240,12 @@ class InfZoomer:
                     self.C.inpainting_mask_blur,
                     self.C.inpainting_fill_mode,
                     False, # self.C.inpainting_full_res,
-                    32 #self.C.inpainting_padding,
+                    0 #self.C.inpainting_padding,
                 )
-                expanded_image = processed.images[0]
                 #
                 
                 if len(processed.images) > 0:
+                    expanded_image = processed.images[0]
                     zoomed_img = cv2_to_pil(cv2.resize(
                         pil_to_cv2(expanded_image),
                         (self.width,self.height), 
@@ -250,7 +255,6 @@ class InfZoomer:
                         
                     if self.outerZoom:
                         self.main_frames[-1] = expanded_image # replace small image
-                        processed.images[0]=expanded_image    # display overscaned image in gallery
                         self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
                         
                         if (i < outpaint_steps-1):
@@ -327,13 +331,13 @@ class InfZoomer:
         target_width, target_height = target_size
 
         if width <= 0 or height <= 0 or target_width <= 0 or target_height <= 0 or steps <= 0:
-            return None
+            return []
 
-        width_step = (width - target_width) / steps
-        height_step = (height - target_height) / steps
+        width_step = (width - target_width) / (steps+1)     #+1 enforce steps BETWEEN keyframe, dont reach the target size. interval  like []
+        height_step = (height - target_height) / (steps+1)
 
-        scaling_steps = [(round(width - i * width_step), round(height - i * height_step)) for i in range(1,steps)]
-        scaling_steps.insert(0,original_size) # initial size is in the list
+        scaling_steps = [(round(width - i * width_step), round(height - i * height_step)) for i in range(1,steps+1)]
+        #scaling_steps.insert(0,original_size) # initial size is in the list
         return scaling_steps
 
    
@@ -346,25 +350,11 @@ class InfZoomer:
         else:
             raise ValueError("unsupported Zoom mode in INfZoom")
 
-        self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
-                                            self.cropCenterTo(current_image,(self.width,self.height)),
-                                            self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount),
-                                            self.C.video_ffmpeg_opts)
-
         outzoomSize = (self.width+self.mask_width*2, self.height+self.mask_height*2)
         target_size = (self.width, self.height) # mask border, hide blipping
 
-
         scaling_steps = self.calculate_interpolation_steps_linear(outzoomSize, target_size, self.num_interpol_frames)
         print(f"Before: {scaling_steps}, length: {len(scaling_steps)}")
-        scaling_steps = self.apply_savitzky_golay_filter(scaling_steps,self.width/self.height)
-        for s in scaling_steps:
-            print(f"Ratios: {str(s[0]/s[1])}",end=";")     
-
-        print(f"After SAVGOL: {scaling_steps}, length: {len(scaling_steps)}")
-        for s in scaling_steps:
-            print(f"Ratios: {str(s[0]/s[1])}",end=";")     
-
 
         # all sizes EVEN
         for i,s in enumerate(scaling_steps):
@@ -372,10 +362,12 @@ class InfZoomer:
 
         print(f"After EVEN: {scaling_steps}, length: {len(scaling_steps)}")
         for s in scaling_steps:
-            print(f"Ratios: {str(s[0]/s[1])}",end=";")     
+            print(f"Ratios: {str(s[0]/s[1])}",end=";")
 
-
-
+        self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
+                                            self.cropCenterTo(current_image,(target_size)),
+                                            self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount-1),
+                                            self.C.video_ffmpeg_opts)
 
         for i in range(len(self.main_frames)):
             if 0 == self.C.video_zoom_mode:
@@ -383,20 +375,27 @@ class InfZoomer:
             else:
                 current_image = self.main_frames[-1-i]
 
-            # Convert PIL image to OpenCV format
+            lastFrame = self.cropCenterTo(current_image,target_size)
+
+            self.contVW.append([lastFrame])
+
             cv2_image = pil_to_cv2(current_image)
 
-            # Resize and crop using OpenCV
-            for j in range(self.num_interpol_frames - 1):
-                print(f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r", end="")
-                new_width, new_height = scaling_steps[j]
-                resized_image = cv2.resize(cv2_image, (new_width, new_height), interpolation=cv2.INTER_AREA) #INTER_LANCZOS4
-                cropped_image_cv2 = crop_center(resized_image, self.width, self.height)
-
-                # Convert the cropped image back to PIL format
+            # Resize and crop using OpenCV2
+            for j in range(self.num_interpol_frames):
+                print(f"\033[KInfZoom: Interpolate frame(CV2): main/inter: {i}/{j}   \r", end="")
+                resized_image = cv2.resize(
+                    cv2_image,
+                    (scaling_steps[j][0], scaling_steps[j][1]),
+                    interpolation=cv2.INTER_AREA
+                )
+                cropped_image_cv2 = cv2_crop_center(resized_image, target_size)
                 cropped_image_pil = cv2_to_pil(cropped_image_cv2)
                 
                 self.contVW.append([cropped_image_pil])
+                lastFrame = cropped_image_pil
+            
+        self.contVW.finish(lastFrame, int(self.C.video_last_frame_dupe_amount))
 
         """ USING PIL:
         for i in range(len(self.main_frames)):
@@ -557,31 +556,6 @@ class InfZoomer:
         bottom = (height + toSize[1])//2
         return im.crop((left, top, right, bottom))
 
-
-    def apply_savitzky_golay_filter(self,scaling_steps, original_ratio, window_length=5, polyorder=2):
-        widths, heights = zip(*scaling_steps)
-        smoothed_widths = savgol_filter(widths, window_length, polyorder)
-        smoothed_heights = savgol_filter(heights, window_length, polyorder)
-
-        integer_steps = []
-        for new_width, new_height in zip(smoothed_widths, smoothed_heights):
-            floor_width, ceil_width = int(new_width // 1), int(new_width // 1 + 1)
-            floor_height, ceil_height = int(new_height // 1), int(new_height // 1 + 1)
-
-            floor_ratio = floor_width / floor_height
-            ceil_ratio = ceil_width / ceil_height
-
-            if abs(floor_ratio - original_ratio) < abs(ceil_ratio - original_ratio):
-                new_width, new_height = floor_width, floor_height
-            else:
-                new_width, new_height = ceil_width, ceil_height
-
-            integer_steps.append((new_width, new_height))
-
-        return integer_steps
-    
-
-
 def create_mask_with_circles(original_image, border_width, border_height, overmask: int, radius=4):
     # Create a new image with border and draw a mask
     new_width = original_image.width + 2 * border_width
@@ -621,8 +595,8 @@ def pil_to_cv2(image):
 def cv2_to_pil(image):
     return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
-def crop_center(img,cropx,cropy):
+def cv2_crop_center(img, toSize: tuple[int,int]):
     y,x = img.shape[:2]
-    startx = x//2-(cropx//2)
-    starty = y//2-(cropy//2)    
-    return img[starty:starty+cropy,startx:startx+cropx]
+    startx = x//2-(toSize[0]//2)
+    starty = y//2-(toSize[1]//2)    
+    return img[starty:starty+toSize[1],startx:startx+toSize[0]]
