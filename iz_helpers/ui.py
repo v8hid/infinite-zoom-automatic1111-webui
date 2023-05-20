@@ -18,7 +18,7 @@ from .static_variables import (
     default_sampler,
     default_gradient_size,
 )
-from .helpers import validatePromptJson_throws, putPrompts, clearPrompts
+from .helpers import validatePromptJson_throws, putPrompts, clearPrompts, renumberDataframe
 from .prompt_util import readJsonPrompt
 from .static_variables import promptTableHeaders
 
@@ -318,6 +318,17 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                         audio_filename,
                         main_seed
                     ],
+                )
+                renumberPrompts_button = gr.Button(
+                    value= "Renumber Prompts",
+                    variant="secondary",
+                    elem_classes="sm infzoom_tab_butt",
+                    elem_id="infzoom_rnP_butt",
+                )
+                renumberPrompts_button.click(
+                    fn=renumberDataframe,
+                    inputs=[main_prompts],
+                    outputs=[main_prompts]
                 )
 
             with gr.Column(scale=1, variant="compact"):

@@ -161,3 +161,28 @@ def find_ffmpeg_binary():
             return files[0] if files else 'ffmpeg'
         except:
             return 'ffmpeg'
+
+
+def renumberDataframe(data):
+    # Store the first sublist as index0
+    index0 = data[0]
+
+    # Skip the first sublist (index 0)
+    data = data[1:]
+
+    try:
+        # Sort the data based on the first column
+        data.sort(key=lambda x: int(x[0]))
+
+        # Renumber the index values sequentially
+        for i in range(len(data)):
+            data[i][0] = i + 1
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return [index0] + data
+
+    # Prepend index0 to the renumbered data
+    data.insert(0, index0)
+
+    return data
