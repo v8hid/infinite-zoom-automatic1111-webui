@@ -191,7 +191,12 @@ class InfZoomer:
         currentImage = self.main_frames[-1]
 
         # just 30 radius to get inpaint connected between outer and innter motive
-        masked_image = create_mask_with_circles(currentImage, self.mask_width, self.mask_height, overmask=self.C.overmask, radius=4)
+        masked_image = create_mask_with_circles(
+            currentImage, 
+            self.mask_width, self.mask_height, 
+            overmask=self.C.overmask, 
+            radius=min(self.mask_height,self.mask_height)*0.2
+        )
 
         new_width= masked_image.width
         new_height=masked_image.height
