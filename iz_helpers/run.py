@@ -1,5 +1,8 @@
 import math, time, os
 import numpy as np
+from scipy.signal import savgol_filter
+from typing import Callable
+import cv2
 from PIL import Image, ImageFilter, ImageDraw, ImageColor
 from modules.ui import plaintext_to_html
 import modules.shared as shared
@@ -13,7 +16,15 @@ from .helpers import (
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
 from .image import shrink_and_paste_on_blank, open_image, apply_alpha_mask, draw_gradient_ellipse, resize_and_crop_image, crop_fethear_ellipse, crop_inner_image
-from .video import write_video, add_audio_to_video
+from .video import write_video, add_audio_to_video, ContinuousVideoWriter
+from .InfZoomConfig import InfZoomConfig
+
+class InfZoomer:
+    def __init__(self, config: InfZoomConfig) -> None:
+        self.C = config
+        self.prompts = {}
+        self.main_frames = []
+        self.out_config = {}
 
 def outpaint_steps(
     width,
@@ -193,6 +204,7 @@ def create_zoom(
     video_zoom_mode,
     video_start_frame_dupe_amount,
     video_last_frame_dupe_amount,
+    video_ffmpeg_opts,
     inpainting_mask_blur,
     inpainting_fill_mode,
     zoom_speed,
@@ -204,6 +216,9 @@ def create_zoom(
     upscale_do,
     upscaler_name,
     upscale_by,
+    overmask,
+    outpaintStrategy,
+    outpaint_amount_px,
     blend_image,
     blend_mode,
     blend_gradient_size,

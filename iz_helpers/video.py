@@ -70,41 +70,44 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
     writer.close()
 
 
-    class ContinuousVideoWriter:
+class ContinuousVideoWriter:
 
-        _writer = None
+    _writer = None
     
-        def __init__(self, file_path, initframe, fps, start_frame_dupe_amount=15):
-            """
-            Writes initial frame to a new mp4 video file
-            :param file_path: Path to output video, must end with .mp4
-            :param frame: Start image PIL.Image objects
-            :param fps: Desired frame rate
-            :param reversed: if order of images to be reversed (default = True)
-            """
+    def __init__(self, file_path, initframe, fps, start_frame_dupe_amount=15, video_ffmpeg_opts="" ):
+        """
+        Writes initial frame to a new mp4 video file
+        :param file_path: Path to output video, must end with .mp4
+        :param frame: Start image PIL.Image objects
+        :param fps: Desired frame rate
+        :param reversed: if order of images to be reversed (default = True)
+        """
+        ffopts = []
+        if video_ffmpeg_opts is not "":
+            ffopts= video_ffmpeg_opts.split(" ")
 
-            writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None)
-            start_frames = [initframe] * start_frame_dupe_amount
-            for f in start_frames:
-                writer.append_data(np.array(f))
-            self._writer = writer
+        writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None, ffmpeg_params=ffopts)
+        start_frames = [initframe] * start_frame_dupe_amount
+        for f in start_frames:
+            writer.append_data(np.array(f))
+        self._writer = writer
     
-        def append(self, frames):
-            """
-            Append a list of image PIL.Image objects to the end of the file.
-            :param frames: List of image PIL.Image objects
-            """
-            for i,f in enumerate(frames):
-                self._writer.append_data(np.array(f))
+    def append(self, frames):
+        """
+        Append a list of image PIL.Image objects to the end of the file.
+        :param frames: List of image PIL.Image objects
+        """
+        for i,f in enumerate(frames):
+            self._writer.append_data(np.array(f))
     
-        def finish(self, frame, last_frame_dupe_amount=30 ):
-            """
-            Closes the file writer.
-            """
-            for i in range(last_frame_dupe_amount):
-                self._writer.append_data(np.array(frame))
+    def finish(self, frame, last_frame_dupe_amount=30 ):
+        """
+        Closes the file writer.
+        """
+        for i in range(last_frame_dupe_amount):
+            self._writer.append_data(np.array(frame))
         
-            self._writer.close()
+        self._writer.close()
 
 def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'ffmpeg'):
     command = [ffmpeg_location, '-i', video_path, '-i', audio_path, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', output_path]

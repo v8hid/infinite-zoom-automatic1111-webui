@@ -42,6 +42,8 @@ def open_image(image_path):
     Returns:
         Image: A PIL Image object of the opened image.
     """
+    # Strip leading and trailing double quotation marks, if present
+    image_path = image_path.strip('"')
     if image_path.startswith('http'):
         # If the image path is a URL, download the image using requests
         response = requests.get(image_path)
