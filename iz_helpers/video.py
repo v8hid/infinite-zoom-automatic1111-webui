@@ -113,3 +113,9 @@ def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'f
     command = [ffmpeg_location, '-i', video_path, '-i', audio_path, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', output_path]
     subprocess.run(command)
     return output_path
+
+def resize_video(input_path, output_path, width:int, height:int, flags:str="lanczos"):
+    scaling = f'{width}:{height}'
+    command = ['ffmpeg', '-i', input_path, '-vf', f'scale={scaling}:flags={flags}', output_path]
+    subprocess.run(command)
+    return output_path
