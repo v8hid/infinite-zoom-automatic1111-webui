@@ -29,6 +29,12 @@ class InfZoomConfig():
     upscale_by:float
     overmask:int
     outpaintStrategy: str
+    blend_image:Image
+    blend_mode:str
+    blend_gradient_size:int
+    blend_invert_do:bool
+    blend_color:str
+    audio_filename=None,
     inpainting_denoising_strength:float=1
     inpainting_full_res:int =0
     inpainting_padding:int=0

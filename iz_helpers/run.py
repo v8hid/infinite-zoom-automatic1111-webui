@@ -23,8 +23,80 @@ class InfZoomer:
     def __init__(self, config: InfZoomConfig) -> None:
         self.C = config
         self.prompts = {}
+        self.prompt_images = {}
+        self.prompt_alpha_mask_images = {}
+        self.prompt_image_is_keyframe = {}
         self.main_frames = []
         self.out_config = {}
+
+        for x in self.C.prompts_array:
+            try:
+                key = int(x[0])
+                value = str(x[1])
+                file_loc = str(x[2])
+                alpha_mask_loc = str(x[3])
+                is_keyframe = bool(x[4])
+                self.prompts[key] = value
+                self.prompt_images[key] = file_loc
+                self.prompt_alpha_mask_images[key] = alpha_mask_loc
+                self.prompt_image_is_keyframe[key] = value_to_bool(is_keyframe)
+            except ValueError:
+                pass
+
+        assert len(self.C.prompts_array) > 0, "prompts is empty"
+
+        fix_env_Path_ffprobe()
+        self.out_config = self.prepare_output_path()
+
+        self.current_seed = self.C.seed
+
+        # knowing the mask_height and desired outputsize find a compromise due to align 8 contraint of diffuser
+        self.width = closest_upper_divisible_by_eight(self.C.outputsizeW)
+        self.height = closest_upper_divisible_by_eight(self.C.outputsizeH)
+
+        if self.width > self.height:
+            self.mask_width  = self.C.outpaint_amount_px 
+            self.mask_height = math.trunc(self.C.outpaint_amount_px * self.height/self.width)  
+        else:
+            self.mask_height  = self.C.outpaint_amount_px  
+            self.mask_width  = math.trunc(self.C.outpaint_amount_px * self.width/self.height)  
+
+        # here we leave slightly the desired ratio since if size+2*mask_size % 8 != 0
+        # distribute "aligning pixels" to the mask size equally. 
+        # only consider mask_size since image size is alread 8-aligned
+        self.mask_width -= self.mask_width % 4
+        self.mask_height -= self.mask_height % 4
+
+        assert 0 == (2*self.mask_width+self.width) % 8
+        assert 0 == (2*self.mask_height+self.height) % 8
+
+        print (f"Adapted sizes for diffusers to: {self.width}x{self.height}+mask:{self.mask_width}x{self.mask_height}. New ratio: {(self.width+self.mask_width)/(self.height+self.mask_height)} ")
+
+        self.num_interpol_frames = round(self.C.video_frame_rate * self.C.zoom_speed) - 1 # keyframe not to be interpolated
+
+        if (self.C.outpaintStrategy == "Corners"):
+            self.fnOutpaintMainFrames = self.outpaint_steps_cornerStrategy
+            self.fnInterpolateFrames = self.interpolateFramesOuterZoom
+        elif (self.C.outpaintStrategy == "Center"):
+           self.fnOutpaintMainFrames = self.outpaint_steps_v8hid
+           self.fnInterpolateFrames = self.interpolateFramesSmallCenter
+        else:
+            raise ValueError("Unsupported outpaint strategy in Infinite Zoom")
+
+        self.outerZoom = True    # scale from overscan to target viewport
+
+    # object properties, different from user input config
+    out_config = {}
+    prompts = {}
+    main_frames:Image = []
+
+    outerZoom: bool
+    mask_width: int
+    mask_height: int
+    current_seed: int
+    contVW: ContinuousVideoWriter
+    fnOutpaintMainFrames: Callable
+    fnInterpolateFrames: Callable
 
 def outpaint_steps(
     width,
@@ -569,3 +641,48 @@ def create_zoom_single(
         plaintext_to_html(processed.info),
         plaintext_to_html(""),
     )
+
+def create_mask_with_circles(original_image, border_width, border_height, overmask: int, radius=4):
+    # Create a new image with border and draw a mask
+    new_width = original_image.width + 2 * border_width
+    new_height = original_image.height + 2 * border_height
+
+    # Create new image, default is black
+    mask = Image.new('RGB', (new_width, new_height), 'white')
+
+    # Draw black rectangle
+    draw = ImageDraw.Draw(mask)
+    draw.rectangle([border_width+overmask, border_height+overmask, new_width - border_width-overmask, new_height - border_height-overmask], fill='black')
+
+    # Coordinates for circles
+    circle_coords = [
+        (border_width, border_height),  # Top-left
+        (new_width - border_width, border_height),  # Top-right
+        (border_width, new_height - border_height),  # Bottom-left
+        (new_width - border_width, new_height - border_height),  # Bottom-right
+        (new_width // 2, border_height),  # Middle-top
+        (new_width // 2, new_height - border_height),  # Middle-bottom
+        (border_width, new_height // 2),  # Middle-left
+        (new_width - border_width, new_height // 2)  # Middle-right
+    ]
+
+    # Draw circles
+    for coord in circle_coords:
+        draw.ellipse([coord[0] - radius, coord[1] - radius, coord[0] + radius, coord[1] + radius], fill='white')
+    return mask
+
+
+
+
+
+def pil_to_cv2(image):
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+
+def cv2_to_pil(image):
+    return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+def cv2_crop_center(img, toSize: tuple[int,int]):
+    y,x = img.shape[:2]
+    startx = x//2-(toSize[0]//2)
+    starty = y//2-(toSize[1]//2)
+    return img[starty:starty+toSize[1],startx:startx+toSize[0]]
