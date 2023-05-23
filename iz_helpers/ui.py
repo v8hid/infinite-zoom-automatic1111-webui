@@ -110,14 +110,14 @@ def on_ui_tabs():
                                 minimum=16,
                                 maximum=2048,
                                 value=shared.opts.data.get("infzoom_outsizeW", 512),
-                                step=16,
+                                step=8,
                                 label="Output Width",
                             )
                             main_height = gr.Slider(
                                 minimum=16,
                                 maximum=2048,
                                 value=shared.opts.data.get("infzoom_outsizeH", 512),
-                                step=16,
+                                step=8,
                                 label="Output Height",
                             )
                         with gr.Row():
