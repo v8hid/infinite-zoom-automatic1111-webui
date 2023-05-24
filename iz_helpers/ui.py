@@ -386,7 +386,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 )
 
         generate_btn.click(
-            fn=wrap_gradio_gpu_call(create_zoom, extra_outputs=[None, "", ""]),
+            fn=wrap_gradio_gpu_call(createZoom, extra_outputs=[None, "", ""]),
             inputs=[
                 main_common_prompt_pre,
                 main_prompts,

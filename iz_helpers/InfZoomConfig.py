@@ -30,11 +30,11 @@ class InfZoomConfig():
     overmask:int
     outpaintStrategy: str
     blend_image:Image
-    blend_mode:str
+    blend_mode:int #0: None, 1: Blend, 2: AlphaComposite, 3: LumaWipe
     blend_gradient_size:int
     blend_invert_do:bool
     blend_color:str
-    audio_filename=None,
+    audio_filename:str=None
     inpainting_denoising_strength:float=1
     inpainting_full_res:int =0
     inpainting_padding:int=0

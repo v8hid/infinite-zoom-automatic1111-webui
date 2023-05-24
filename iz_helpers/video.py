@@ -74,7 +74,7 @@ class ContinuousVideoWriter:
 
     _writer = None
     
-    def __init__(self, file_path, initframe, fps, start_frame_dupe_amount=15, video_ffmpeg_opts="" ):
+    def __init__(self, file_path, initframe, nextframe, fps, start_frame_dupe_amount=15, video_ffmpeg_opts="", blend_invert: bool = False, blend_image= None, blend_type:int = 0, blend_gradient_size: int = 63, blend_color = "#ffff00" ):
         """
         Writes initial frame to a new mp4 video file
         :param file_path: Path to output video, must end with .mp4
@@ -87,7 +87,19 @@ class ContinuousVideoWriter:
             ffopts= video_ffmpeg_opts.split(" ")
 
         writer = imageio.get_writer(file_path, fps=fps, macro_block_size=None, ffmpeg_params=ffopts)
-        start_frames = [initframe] * start_frame_dupe_amount
+        # Duplicate the start frames
+        if blend_type != 0:
+            if blend_image is None:
+                blend_image = draw_gradient_ellipse(*initframe.size, blend_gradient_size)
+        
+            if blend_type == 1:
+                start_frames = blend_images(initframe, nextframe, math.ceil(start_frame_dupe_amount), blend_invert)
+            elif blend_type == 2:
+                start_frames = alpha_composite_images(initframe, nextframe, blend_image, math.ceil(start_frame_dupe_amount), blend_invert)
+            elif blend_type == 3:
+                start_frames = PSLumaWipe_images2(initframe, nextframe, blend_image, math.ceil(start_frame_dupe_amount), blend_invert,blend_color)            
+        else:
+            start_frames = [initframe] * start_frame_dupe_amount
         for f in start_frames:
             writer.append_data(np.array(f))
         self._writer = writer
@@ -100,13 +112,22 @@ class ContinuousVideoWriter:
         for i,f in enumerate(frames):
             self._writer.append_data(np.array(f))
     
-    def finish(self, frame, last_frame_dupe_amount=30 ):
+    def finish(self, exitframe, next_to_last_frame, last_frame_dupe_amount=30, blend_invert: bool = False, blend_image= None, blend_type:int = 0, blend_gradient_size: int = 63, blend_color = "#ffff00"  ):
         """
         Closes the file writer.
         """
-        for i in range(last_frame_dupe_amount):
-            self._writer.append_data(np.array(frame))
-        
+        # Duplicate the exit frames
+        if blend_type != 0:
+            if blend_type == 1:
+                end_frames = blend_images(next_to_last_frame, exitframe, math.ceil(last_frame_dupe_amount), blend_invert)
+            elif blend_type == 2:
+                end_frames = alpha_composite_images(next_to_last_frame, exitframe, blend_image, math.ceil(last_frame_dupe_amount), blend_invert)
+            elif blend_type == 3:
+                end_frames = PSLumaWipe_images2(next_to_last_frame, exitframe, blend_image, math.ceil(last_frame_dupe_amount), blend_invert, blend_color)
+        else:
+            end_frames = [exitframe] * last_frame_dupe_amount
+        for f in end_frames:
+            self._writer.append_data(np.array(f))       
         self._writer.close()
 
 def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'ffmpeg'):
