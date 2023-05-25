@@ -669,7 +669,8 @@ def blend_images(start_image: Image, stop_image: Image, num_frames: int, invert:
         blended_frames.append(blended_image)
 
         end = timer()
-        print(f"blend:{end - start}")
+        #print(f"blend:{end - start}")
+        print(f"\033[Blend frame:{len(blended_frames)} {(i/(num_frames -1)) * 100}% in {end - start}  \r", end="")
     blended_frames.append(stop_image)
     # Return the list of blended frames
     return blended_frames
@@ -707,7 +708,8 @@ def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Im
         # Append the blended frame to the list
         ac_frames.append(ac_image)
         end = timer()
-        print(f"alpha_composited:{end - start}")
+        #print(f"alpha_composited:{end - start}")
+        print(f"\033[alpha_composited frame:{len(ac_frames)} {(i/(num_frames -1)) * 100}% in {end - start}  \r", end="")
     ac_frames.append(stop_image)
     # Return the list of blended frames
     return ac_frames
@@ -890,6 +892,7 @@ def PSLumaWipe_images2(start_image: Image, stop_image: Image, luma_wipe_image: I
         # call PSLumaWipe for frame
         transition = PSLumaWipe2(start_image.copy(), stop_image.copy(), luma_wipe_image.copy(), transition_color, luma_progress, invert, softness, 0.02, 0.01)                
         lw_frames.append(transition)
-        print(f"Luma Wipe frame:{len(lw_frames)} {transition.size} {luma_progress * 100}%")
+        print(f"\033[Luma Wipe frame:{len(lw_frames)} {transition.size} {luma_progress * 100}%   \r", end="")
+        #print(f"Luma Wipe frame:{len(lw_frames)} {transition.size} {luma_progress * 100}%")
     lw_frames.append(stop_image.convert("RGBA"))
     return lw_frames

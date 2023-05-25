@@ -247,7 +247,7 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                         minimum=4,
                         maximum=508,
                         step=8,
-                        value=64,
+                        value=188,
                     )
 
                     inpainting_mask_blur = gr.Slider(
