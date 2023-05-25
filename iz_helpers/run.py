@@ -112,6 +112,11 @@ class InfZoomer:
 
         processed = self.fnOutpaintMainFrames()
 
+        #trim frames that are blended or luma wiped
+        if (self.C.blend_mode != 0):
+            #processed = processed[1:-1]
+            self.main_frames = self.main_frames[1:-1]
+
         if (self.C.upscale_do): 
             self.doUpscaling()
 
@@ -122,9 +127,15 @@ class InfZoomer:
             self.contVW = ContinuousVideoWriter(
                 self.out_config["video_filename"], 
                 self.main_frames[0],
+                self.main_frames[1],
                 self.C.video_frame_rate,
                 int(self.C.video_start_frame_dupe_amount), 
-                self.C.video_ffmpeg_opts
+                self.C.video_ffmpeg_opts,
+                self.C.blend_invert_do,
+                self.C.blend_image,
+                self.C.blend_mode,
+                self.C.blend_gradient_size,
+                hex_to_rgba(self.C.blend_color)
             )
         
         self.fnInterpolateFrames() # changes main_frame and writes to video
@@ -294,47 +305,37 @@ class InfZoomer:
                         print("using keyframe as exit image")
                     else:
                         # apply predefined or generated alpha mask to current image:
-                        if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-                            current_image_amask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (i + 1))])
-                        else:
-                            current_image_gradient_ratio = (self.C.blend_gradient_size / 100)
-                            current_image_amask = draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 2.5)
-                        current_image = apply_alpha_mask(current_image, current_image_amask)
+                        current_image = apply_alpha_mask(current_image, self.getAlphaMask(current_image, i + 1))
                         self.main_frames.append(current_image)
                     self.save2Collect(current_image, f"key_frame_{i + 1}.png")                    
                 
-                if paste_previous_image and i > 0:
-                    if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-                        current_image_amask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (i + 1))])
-                    else:
-                        current_image_gradient_ratio = (self.C.blend_gradient_size / 100)
-                        current_image_amask = draw_gradient_ellipse(self.main_frames[-1].width, self.main_frames[-1].height, current_image_gradient_ratio, 0.0, 2.5)
-                    current_image = apply_alpha_mask(self.main_frames[-1], current_image_amask)
-                    expanded_image.paste(current_image, (self.mask_width,self.mask_height))
+            if paste_previous_image and i > 0:
+                current_image = apply_alpha_mask(self.main_frames[-1], self.getAlphaMask(self.main_frames[i + 1], i + 1))
+                expanded_image.paste(current_image, (self.mask_width,self.mask_height))
+                zoomed_img = cv2_to_pil(cv2.resize(
+                    pil_to_cv2(expanded_image),
+                    (self.width,self.height), 
+                    interpolation=cv2.INTER_AREA
+                    )
+                )
+                        
+                if self.outerZoom:
+                    self.main_frames[-1] = expanded_image # replace small image
+                    self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
+                        
+                    if (i < outpaint_steps-1):
+                        self.main_frames.append(zoomed_img)   # prepare next frame with former content
+
+                else:
                     zoomed_img = cv2_to_pil(cv2.resize(
-                        pil_to_cv2(expanded_image),
-                        (self.width,self.height), 
-                        interpolation=cv2.INTER_AREA
+                            expanded_image,
+                            (self.width,self.height),
+                            interpolation=cv2.INTER_AREA
                         )
                     )
-                        
-                    if self.outerZoom:
-                        self.main_frames[-1] = expanded_image # replace small image
-                        self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
-                        
-                        if (i < outpaint_steps-1):
-                            self.main_frames.append(zoomed_img)   # prepare next frame with former content
-
-                    else:
-                        zoomed_img = cv2_to_pil(cv2.resize(
-                                expanded_image,
-                                (self.width,self.height),
-                                interpolation=cv2.INTER_AREA
-                            )
-                        )
-                        self.main_frames.append(zoomed_img)
-                        processed.images[0]=self.main_frames[-1]
-                        self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
+                    self.main_frames.append(zoomed_img)
+                    processed.images[0]=self.main_frames[-1]
+                    self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
 
         if exit_img is not None:
             self.main_frames.append(exit_img)
@@ -344,12 +345,12 @@ class InfZoomer:
 
     def outpaint_steps_v8hid(self):
 
-        self.main_frames = [self.C.init_img.convert("RGBA")]
-        prev_image = self.C.init_img.convert("RGBA")
+        prev_image = self.main_frames[0].convert("RGBA")
         exit_img = self.C.custom_exit_image.convert("RGBA") if self.C.custom_exit_image else None
 
-        for i in range(self.C.num_outpainting_steps):
-            print (f"Outpaint step: {str(i + 1)} / {str(self.C.num_outpainting_steps)} Seed: {str(self.current_seed)}")
+        outpaint_steps=self.C.num_outpainting_steps
+        for i in range(outpaint_steps):
+            print (f"Outpaint step: {str(i + 1)} / {str(outpaint_steps)} Seed: {str(self.current_seed)}")
         
             current_image = self.main_frames[-1]
             current_image = shrink_and_paste_on_blank(
@@ -363,14 +364,14 @@ class InfZoomer:
             paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
             print(f"paste_prev_image: {paste_previous_image} {i} {i + 1}")
 
-            if self.C.custom_exit_image and ((i + 1) == self.C.num_outpainting_steps):
+            if self.C.custom_exit_image and ((i + 1) == outpaint_steps):
                 current_image = cv2_to_pil(
                     cv2.resize( pil_to_cv2(
                         self.C.custom_exit_image),
                         (self.width, self.height), 
                         interpolation=cv2.INTER_AREA)
                 )                
-                exit_img = current_image.convert("RGB")
+                exit_img = current_image.convert("RGBA")
                 # print("using Custom Exit Image")
                 self.save2Collect(current_image, f"exit_img.png")
 
@@ -397,7 +398,7 @@ class InfZoomer:
                     )
 
                     if len(processed.images) > 0:
-                        self.main_frames.append(processed.images[0].convert("RGB"))
+                        self.main_frames.append(processed.images[0].convert("RGBA"))
                         self.save2Collect(processed.images[0], f"outpain_step_{i}.png")
                 else:
                      # use prerendered image, known as keyframe. Resize to target size
@@ -406,17 +407,12 @@ class InfZoomer:
                     current_image = resize_and_crop_image(current_image, self.width, self.height).convert("RGBA")
 
                     # if keyframe is last frame, use it as exit image
-                    if (not paste_previous_image) and ((i + 1) == self.C.outpaint_steps):
+                    if (not paste_previous_image) and ((i + 1) == outpaint_steps):
                         exit_img = current_image
                         print("using keyframe as exit image")
                     else:
                         # apply predefined or generated alpha mask to current image:
-                        if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-                            current_image_amask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (i + 1))])
-                        else:
-                            current_image_gradient_ratio = (self.C.blend_gradient_size / 100)
-                            current_image_amask = draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 2.5)
-                        current_image = apply_alpha_mask(current_image, current_image_amask)
+                        current_image = apply_alpha_mask(current_image, self.getAlphaMask(current_image, i + 1))
                         self.main_frames.append(current_image)
                     self.save2Collect(current_image, f"key_frame_{i + 1}.png")
 
@@ -427,21 +423,17 @@ class InfZoomer:
                 # apply predefined or generated alpha mask to current image: 
                 # current image must be redefined as most current image in frame stack
                 # use previous image alpha mask if available
-                if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-                    current_image_amask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (i + 1))])
-                else:
-                    current_image_gradient_ratio = (self.C.blend_gradient_size / 100)
-                    current_image_amask = draw_gradient_ellipse(self.main_frames[i + 1].width, self.main_frames[i + 1].height, current_image_gradient_ratio, 0.0, 2.5)
-                current_image = apply_alpha_mask(self.main_frames[i + 1], current_image_amask)
+                current_image = apply_alpha_mask(self.main_frames[i + 1], self.getAlphaMask(self.main_frames[i + 1], i + 1))
 
                 #handle previous image alpha layer
                 #prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
                 ## apply available alpha mask of previous image (inverted)
-                if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (i))] != "":
-                    prev_image_amask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (i))])
-                else:
-                    prev_image_gradient_ratio = (self.C.blend_gradient_size / 100)
-                    prev_image_amask = draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.5)
+                #if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (i))] != "":
+                #    prev_image_amask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (i))])
+                #else:
+                #    prev_image_gradient_ratio = (self.C.blend_gradient_size / 100)
+                #    prev_image_amask = draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.5)                
+                prev_image_amask = self.getAlphaMask(prev_image,i)
                 #prev_image = apply_alpha_mask(prev_image, prev_image_amask, invert = True)
 
                 # merge previous image with current image
@@ -476,14 +468,16 @@ class InfZoomer:
    
     def interpolateFramesOuterZoom(self):
 
-        if 0 == self.C.video_zoom_mode:
-            current_image = self.main_frames[0]
-            next_image = self.main_frames[1]
-        elif 1 == self.C.video_zoom_mode:
-            current_image = self.main_frames[-1]
-            next_image = self.main_frames[-2]
-        else:
-            raise ValueError("unsupported Zoom mode in INfZoom")
+        #frames reversed prior to interpolation
+
+        #if 0 == self.C.video_zoom_mode:
+        current_image = self.main_frames[0]
+        next_image = self.main_frames[1]
+        #elif 1 == self.C.video_zoom_mode:
+        #    current_image = self.main_frames[-1]
+        #    next_image = self.main_frames[-2]
+        #else:
+        #    raise ValueError("unsupported Zoom mode in INfZoom")
 
         outzoomSize = (self.width+self.mask_width*2, self.height+self.mask_height*2)
         target_size = (self.width, self.height) # mask border, hide blipping
@@ -500,54 +494,53 @@ class InfZoomer:
             print(f"Ratios: {str(s[0]/s[1])}",end=";")
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
-                                            self.cropCenterTo(current_image,(target_size)),
-                                            self.cropCenterTo(next_image,(target_size)),
+                                            apply_alpha_mask(self.cropCenterTo(current_image.copy(),(target_size)),current_image.split()[3]),
+                                            apply_alpha_mask(self.cropCenterTo(next_image.copy(),(target_size)),next_image.split()[3]),
                                             self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount-1),
                                             self.C.video_ffmpeg_opts,
                                             self.C.blend_invert_do,
                                             self.C.blend_image,
                                             self.C.blend_mode,
                                             self.C.blend_gradient_size,
-                                            self.C.blend_color)
+                                            hex_to_rgba(self.C.blend_color))
 
         for i in range(len(self.main_frames)):
-            if 0 == self.C.video_zoom_mode:
-                current_image = self.main_frames[0+i]
-                previous_image = self.main_frames[i-1]
-            else:
-                current_image = self.main_frames[-1-i]
-                previous_image = self.main_frames[0-i]
 
-            lastFrame = self.cropCenterTo(current_image,target_size)
-            nextToLastFrame = self.cropCenterTo(previous_image,target_size)
+            current_image = self.main_frames[0+i]
+            previous_image = self.main_frames[i-1]
 
-            if self.C.blend_mode == 0:
-                self.contVW.append([lastFrame])
+            lastFrame =  apply_alpha_mask(self.cropCenterTo(current_image.copy(),target_size),current_image.split()[3])
+             
+            self.contVW.append([lastFrame])
 
-                cv2_image = pil_to_cv2(current_image)
+            cv2_image = pil_to_cv2(current_image)
 
-                # Resize and crop using OpenCV2
-                for j in range(self.num_interpol_frames):
-                    print(f"\033[KInfZoom: Interpolate frame(CV2): main/inter: {i}/{j}   \r", end="")
-                    resized_image = cv2.resize(
-                        cv2_image,
-                        (scaling_steps[j][0], scaling_steps[j][1]),
-                        interpolation=cv2.INTER_AREA
-                    )
-                    cropped_image_cv2 = cv2_crop_center(resized_image, target_size)
-                    cropped_image_pil = cv2_to_pil(cropped_image_cv2)
+            # Resize and crop using OpenCV2
+            for j in range(self.num_interpol_frames):
+                print(f"\033[KInfZoom: Interpolate frame(CV2): main/inter: {i}/{j}   \r", end="")
+                resized_image = cv2.resize(
+                    cv2_image,
+                    (scaling_steps[j][0], scaling_steps[j][1]),
+                    interpolation=cv2.INTER_AREA
+                )
+                cropped_image_cv2 = cv2_crop_center(resized_image, target_size)
+                cropped_image_pil = cv2_to_pil(cropped_image_cv2)
                 
-                    self.contVW.append([cropped_image_pil])
-                    lastFrame = cropped_image_pil
+                self.contVW.append([cropped_image_pil])
+                lastFrame = cropped_image_pil
+
+        # process last frames
+        lastFrame = self.main_frames[-1]
+        nextToLastFrame = self.main_frames[-2]
             
         self.contVW.finish(lastFrame,
-                           nextToLastFrame,
-                           int(self.C.video_last_frame_dupe_amount),
-                           self.C.blend_invert_do,
-                           self.C.blend_image,
-                           self.C.blend_mode,
-                           self.C.blend_gradient_size,
-                           self.C.blend_color)
+                        nextToLastFrame,
+                        int(self.C.video_last_frame_dupe_amount),
+                        self.C.blend_invert_do,
+                        self.C.blend_image,
+                        self.C.blend_mode,
+                        self.C.blend_gradient_size,
+                        hex_to_rgba(self.C.blend_color))
 
         """ USING PIL:
         for i in range(len(self.main_frames)):
@@ -571,24 +564,18 @@ class InfZoomer:
         """
 
     def interpolateFramesSmallCenter(self):
+        #frames reversed prior to interpolation
 
-        if self.C.video_zoom_mode:
-            firstImage = self.main_frames[0]
-            nextImage = self.main_frames[1]
-        else:
-            firstImage = self.main_frames[-1]
-            nextImage = self.main_frames[-2]
-
-        self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
-                                (firstImage,(self.width,self.height)),
-                                (nextImage,(self.width,self.height)),
+        self.contVW = ContinuousVideoWriter(self.out_config["video_filename"],
+                                self.main_frames[0],#(self.width,self.height)),
+                                self.main_frames[1],#(self.width,self.height)),
                                 self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount),
                                 self.C.video_ffmpeg_opts,
                                 self.C.blend_invert_do,
                                 self.C.blend_image,
                                 self.C.blend_mode,
                                 self.C.blend_gradient_size,
-                                self.C.blend_color)
+                                hex_to_rgba(self.C.blend_color))
 
         for i in range(len(self.main_frames) - 1):
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
@@ -596,10 +583,7 @@ class InfZoomer:
 
                 print (f"\033[KInfZoom: Interpolate frame: main/inter: {i}/{j}   \r",end="")
                 #todo: howto zoomIn when writing each frame; self.main_frames are inverted, howto interpolate?
-                if self.C.video_zoom_mode:
-                    current_image = self.main_frames[i + 1]
-                else:
-                    current_image = self.main_frames[i + 1]
+                current_image = self.main_frames[i + 1]
 
 
                 interpol_image = current_image
@@ -649,6 +633,15 @@ class InfZoomer:
 
             self.contVW.append([current_image])
 
+        self.contVW.finish(self.main_frames[-1],
+                        self.main_frames[-2],
+                        int(self.C.video_last_frame_dupe_amount),
+                        self.C.blend_invert_do,
+                        self.C.blend_image,
+                        self.C.blend_mode,
+                        self.C.blend_gradient_size,
+                        hex_to_rgba(self.C.blend_color))
+
 
     def prepare_output_path(self):
         isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
@@ -688,26 +681,6 @@ class InfZoomer:
         for i, f in enumerate(all_frames):
             self.save2Collect(f, self.out_config, f"frame_{i}")
 
-
-    def crop_inner_image(self, outpainted_img, width_offset, height_offset):
-        width, height = outpainted_img.size
-
-        center_x, center_y = int(width / 2), int(height / 2)
-
-        # Crop the image to the center
-        cropped_img = outpainted_img.crop(
-            (
-                center_x - width_offset,
-                center_y - height_offset,
-                center_x + width_offset,
-                center_y + height_offset,
-            )
-        )
-        prev_step_img = cropped_img.resize((width, height), resample=Image.LANCZOS)
-        # resized_img = resized_img.filter(ImageFilter.SHARPEN)
-
-        return prev_step_img
-
     def cropCenterTo(self, im: Image, toSize: tuple[int,int]):
         width, height = im.size
         left = (width - toSize[0])//2
@@ -715,6 +688,14 @@ class InfZoomer:
         right = (width + toSize[0])//2
         bottom = (height + toSize[1])//2
         return im.crop((left, top, right, bottom))
+
+    def getAlphaMask(self,image, key):
+        if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (key))] != "":
+            image_alpha_mask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (key))])
+        else:
+            image_gradient_ratio = (self.C.blend_gradient_size / 100)
+            image_alpha_mask = draw_gradient_ellipse(image.width, image.height, image_gradient_ratio, 0.0, 2.5)
+        return image_alpha_mask
 
 ##########################################################################################################################
 def outpaint_steps(
@@ -903,7 +884,7 @@ def create_zoom(
     blend_mode,
     blend_gradient_size,
     blend_invert_do,
-    blend_color,
+    blend_color:tuple[int, int, int, int] = (255,255, 0, 255),
     audio_filename=None,
     inpainting_denoising_strength=1,
     inpainting_full_res=0,
@@ -1253,7 +1234,7 @@ def create_zoom_single(
         blend_image,
         blend_mode,
         blend_gradient_size,
-        ImageColor.getcolor(blend_color, "RGBA"),
+        hex_to_rgba(blend_color),
     )
     if audio_filename is not None:
         out_config["video_filename"] = add_audio_to_video(out_config["video_filename"], audio_filename, str.replace(out_config["video_filename"], ".mp4", "_audio.mp4"), find_ffmpeg_binary())
@@ -1311,3 +1292,12 @@ def cv2_crop_center(img, toSize: tuple[int,int]):
     startx = x//2-(toSize[0]//2)
     starty = y//2-(toSize[1]//2)
     return img[starty:starty+toSize[1],startx:startx+toSize[0]]
+
+def hex_to_rgba(hex_color):
+    try:
+        # Convert hex color to RGBA tuple
+        rgba = ImageColor.getcolor(hex_color, "RGBA")
+    except ValueError:
+        # If the hex color is invalid, default to yellow
+        rgba = (255,255,0,255)
+    return rgba

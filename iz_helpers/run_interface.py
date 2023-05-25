@@ -37,7 +37,7 @@ def createZoom(
     blend_gradient_size:int,
     blend_invert_do:bool,
     blend_color:str,
-    audio_filename:str,
+    audio_filename:str = None,
     inpainting_denoising_strength:float=1,
     inpainting_full_res:int =0,
     inpainting_padding:int=0,

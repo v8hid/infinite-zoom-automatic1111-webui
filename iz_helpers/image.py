@@ -192,8 +192,6 @@ def lerp_imagemath_RGBA(img1, img2, alphaimg, factor:int = 50):
     #print(f"lerp_imagemath_rgba: {end - start}")
     return rebuilt_image
    
-
-
 def CMYKInvert(img) :
     return Image.merge(img.mode, [ImageOps.invert(b.convert('L')) for b in img.split()])
 

@@ -101,7 +101,7 @@ class ContinuousVideoWriter:
         else:
             start_frames = [initframe] * start_frame_dupe_amount
         for f in start_frames:
-            writer.append_data(np.array(f))
+            writer.append_data(np.array(f.convert("RGB")))
         self._writer = writer
     
     def append(self, frames):
@@ -110,7 +110,7 @@ class ContinuousVideoWriter:
         :param frames: List of image PIL.Image objects
         """
         for i,f in enumerate(frames):
-            self._writer.append_data(np.array(f))
+            self._writer.append_data(np.array(f.convert("RGB")))
     
     def finish(self, exitframe, next_to_last_frame, last_frame_dupe_amount=30, blend_invert: bool = False, blend_image= None, blend_type:int = 0, blend_gradient_size: int = 63, blend_color = "#ffff00"  ):
         """
@@ -127,7 +127,7 @@ class ContinuousVideoWriter:
         else:
             end_frames = [exitframe] * last_frame_dupe_amount
         for f in end_frames:
-            self._writer.append_data(np.array(f))       
+            self._writer.append_data(np.array(f.convert("RGB")))       
         self._writer.close()
 
 def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'ffmpeg'):
