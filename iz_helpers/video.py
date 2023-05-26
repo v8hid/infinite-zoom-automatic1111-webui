@@ -73,6 +73,7 @@ def write_video(file_path, frames, fps, reversed=True, start_frame_dupe_amount=1
 class ContinuousVideoWriter:
 
     _writer = None
+    _file_path = None
     
     def __init__(self, file_path, initframe, nextframe, fps, start_frame_dupe_amount=15, video_ffmpeg_opts="", blend_invert: bool = False, blend_image= None, blend_type:int = 0, blend_gradient_size: int = 63, blend_color = "#ffff00" ):
         """
@@ -82,6 +83,7 @@ class ContinuousVideoWriter:
         :param fps: Desired frame rate
         :param reversed: if order of images to be reversed (default = True)
         """
+        self._file_path = file_path
         ffopts = []
         if video_ffmpeg_opts is not "":
             ffopts= video_ffmpeg_opts.split(" ")
@@ -130,13 +132,28 @@ class ContinuousVideoWriter:
             self._writer.append_data(np.array(f.convert("RGB")))       
         self._writer.close()
 
+    def reverse_frames(self):
+        """
+        Reverses the video
+        """
+        results = reverse_video(self._file_path, self._file_path)
+
+
 def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'ffmpeg'):
+    # Construct the FFmpeg command
     command = [ffmpeg_location, '-i', video_path, '-i', audio_path, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', output_path]
     subprocess.run(command)
     return output_path
 
-def resize_video(input_path, output_path, width:int, height:int, flags:str="lanczos"):
+def resize_video(input_path, output_path, width:int, height:int, flags:str="lanczos", ffmpeg_location = 'ffmpeg'):
     scaling = f'{width}:{height}'
-    command = ['ffmpeg', '-i', input_path, '-vf', f'scale={scaling}:flags={flags}', output_path]
+    # Construct the FFmpeg command
+    command = [ffmpeg_location, '-i', input_path, '-vf', f'scale={scaling}:flags={flags}', output_path]
     subprocess.run(command)
     return output_path
+
+def reverse_video(input_path, output_path, ffmpeg_location = 'ffmpeg'):
+    # Construct the FFmpeg command
+    command = [ffmpeg_location, '-i', input_path, '-vf', 'reverse', output_path]
+    # Execute the FFmpeg command
+    return subprocess.run(command, capture_output=True)

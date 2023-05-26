@@ -128,12 +128,12 @@ class InfZoomer:
         if (self.C.upscale_do): 
             self.doUpscaling()
 
-        if self.C.video_zoom_mode:
-            self.main_frames = self.main_frames[::-1]
-            self.start_frames_temp = self.start_frames[::-1]
-            self.start_frames = self.end_frames[::-1]
-            self.end_frames = self.start_frames_temp
-            self.start_frames_temp = None
+        #if self.C.video_zoom_mode:
+        #    self.main_frames = self.main_frames[::-1]
+        #    self.start_frames_temp = self.start_frames[::-1]
+        #    self.start_frames = self.end_frames[::-1]
+        #    self.end_frames = self.start_frames_temp
+        #    self.start_frames_temp = None
 
         if not self.outerZoom:
             self.contVW = ContinuousVideoWriter(
@@ -451,7 +451,7 @@ class InfZoomer:
                 #else:
                 #    prev_image_gradient_ratio = (self.C.blend_gradient_size / 100)
                 #    prev_image_amask = draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.5)                
-                prev_image_amask = self.getAlphaMask(prev_image,i, True)
+                prev_image_amask = self.getAlphaMask(prev_image,i, False)
                 #prev_image = apply_alpha_mask(prev_image, prev_image_amask, invert = True)
 
                 # merge previous image with current image
@@ -486,11 +486,11 @@ class InfZoomer:
    
     def interpolateFramesOuterZoom(self):
 
-        #frames reversed prior to interpolation
+        #frames reversed and sorted prior to interpolation
 
         #if 0 == self.C.video_zoom_mode:
-        current_image = self.main_frames[0]
-        next_image = self.main_frames[1]
+        current_image = self.start_frames[0]
+        next_image = self.start_frames[1]
         #elif 1 == self.C.video_zoom_mode:
         #    current_image = self.main_frames[-1]
         #    next_image = self.main_frames[-2]
@@ -548,7 +548,7 @@ class InfZoomer:
                 lastFrame = cropped_image_pil
 
         # process last frames
-        lastFrame = self.end_frames[-1]
+        lastFrame = self.end_frames[1]
         nextToLastFrame = self.end_frames[0]
             
         self.contVW.finish(lastFrame,
@@ -582,7 +582,10 @@ class InfZoomer:
         """
 
     def interpolateFramesSmallCenter(self):
-        #frames reversed prior to interpolation
+        #frames reversed and resorted prior to interpolation
+        if self.C.video_zoom_mode:
+            self.C.video_ffmpeg_opts += "-vf reverse"
+        # note -vf lutyuv=u='(val-maxval/2)*2+maxval/2':v='(val-maxval/2)*2+maxval/2' worked in video tab
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"],
                                 self.start_frames[0],#(self.width,self.height)),
@@ -663,6 +666,10 @@ class InfZoomer:
                         self.C.blend_gradient_size,
                         hex_to_rgba(self.C.blend_color))
 
+        #if self.C.video_zoom_mode:
+        #    result = self.contVW.reverse_frames()
+        #    print(f"reverse result: {result.stdout.decode}")
+
 
     def prepare_output_path(self):
         isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
@@ -726,14 +733,14 @@ class InfZoomer:
         mask_width = self.mask_width
         mask_height = self.mask_height
         # set minimum mask size to 12.5% of the image size
-        if mask_width < self.width / 8:
-            mask_width = self.width / 8
-            mask_height = self.height / 8
+        if mask_width < self.width // 8:
+            mask_width = self.width // 8
+            mask_height = self.height // 8
             print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Correct in Outpaint pixels settings")
-        # set maximum mask size to 50% of the image size
-        if mask_width > self.width / 2:
-            mask_width = self.width / 2
-            mask_height = self.height / 2
+        # set maximum mask size to 75% of the image size
+        if mask_width > (self.width // 4) * 3:
+            mask_width = (self.width // 4) * 3
+            mask_height = (self.height // 4) * 3
             print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Correct in Outpaint pixels settings")
         self.mask_width = int(mask_width)
         self.mask_height = int(mask_height)
