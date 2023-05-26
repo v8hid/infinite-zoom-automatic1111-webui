@@ -15,7 +15,7 @@ from .helpers import (
     do_upscaleImg,value_to_bool, find_ffmpeg_binary
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
-from .image import shrink_and_paste_on_blank, open_image, apply_alpha_mask, draw_gradient_ellipse, resize_and_crop_image, crop_fethear_ellipse, crop_inner_image
+from .image import shrink_and_paste_on_blank, open_image, apply_alpha_mask, draw_gradient_ellipse, resize_and_crop_image, crop_fethear_ellipse, crop_inner_image, combine_masks
 from .video import write_video, add_audio_to_video, ContinuousVideoWriter
 from .InfZoomConfig import InfZoomConfig
 
@@ -370,12 +370,22 @@ class InfZoomer:
             print (f"Outpaint step: {str(i + 1)} / {str(outpaint_steps)} Seed: {str(self.current_seed)}")
         
             current_image = self.main_frames[-1]
+            masked_image = create_mask_with_circles(
+                current_image.copy(), 
+                self.mask_width, self.mask_height, 
+                overmask=self.C.overmask, 
+                radius=min(self.mask_height,self.mask_height)*0.875
+            )
+
             current_image = shrink_and_paste_on_blank(
-                current_image, self.mask_width, self.mask_height
+                current_image, self.mask_width , self.mask_height
             )
 
             mask_image = np.array(current_image)[:, :, 3]
             mask_image = Image.fromarray(255 - mask_image).convert("RGB")
+            mask_image = combine_masks(masked_image, mask_image, *mask_image.size)
+            #mask_image.show()
+            #input("mask image press enter to continue")
 
             #keyframes are not inpainted
             paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
@@ -402,7 +412,7 @@ class InfZoomer:
                         self.C.sampler,
                         self.C.num_inference_steps,
                         self.C.guidance_scale,
-                        self.current_seed,
+                        -1, #self.current_seed,
                         self.width,
                         self.height,
                         current_image,
@@ -585,14 +595,16 @@ class InfZoomer:
         #frames reversed and resorted prior to interpolation
         if self.C.video_zoom_mode:
             self.C.video_ffmpeg_opts += "-vf reverse"
-        # note -vf lutyuv=u='(val-maxval/2)*2+maxval/2':v='(val-maxval/2)*2+maxval/2' worked in video tab
+            # note worked in video tab for ffmpeg expert mode: -vf lutyuv=u='(val-maxval/2)*2+maxval/2':v='(val-maxval/2)*2+maxval/2'
+            # this may mean that if -vf is used in expert mode, we need to add reverse with a comma in the -vf argument
+            blend_invert = not self.C.blend_invert_do        
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"],
                                 self.start_frames[0],#(self.width,self.height)),
                                 self.start_frames[1],#(self.width,self.height)),
                                 self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount),
                                 self.C.video_ffmpeg_opts,
-                                self.C.blend_invert_do,
+                                blend_invert,
                                 self.C.blend_image,
                                 self.C.blend_mode,
                                 self.C.blend_gradient_size,
@@ -660,7 +672,7 @@ class InfZoomer:
         self.contVW.finish(lastFrame,
                         nextToLastFrame,
                         int(self.C.video_last_frame_dupe_amount),
-                        self.C.blend_invert_do,
+                        blend_invert,
                         self.C.blend_image,
                         self.C.blend_mode,
                         self.C.blend_gradient_size,
@@ -730,20 +742,22 @@ class InfZoomer:
         return image_alpha_mask
 
     def fixMaskSizes(self):
+        # This is overkill, as it clips the values twice, but it's the easiest way to ensure the values are correct
         mask_width = self.mask_width
         mask_height = self.mask_height
         # set minimum mask size to 12.5% of the image size
         if mask_width < self.width // 8:
-            mask_width = self.width // 8
-            mask_height = self.height // 8
-            print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Correct in Outpaint pixels settings")
+            mask_width = closest_upper_divisible_by_eight(self.width // 8)
+            mask_height = closest_upper_divisible_by_eight(self.height // 8)
+            print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Recommend: {self.width // 4}x{self.height // 4} Correct in Outpaint pixels settings.")
         # set maximum mask size to 75% of the image size
         if mask_width > (self.width // 4) * 3:
-            mask_width = (self.width // 4) * 3
-            mask_height = (self.height // 4) * 3
-            print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Correct in Outpaint pixels settings")
-        self.mask_width = int(mask_width)
-        self.mask_height = int(mask_height)
+            mask_width = closest_upper_divisible_by_eight((self.width // 4) * 3)
+            mask_height = closest_upper_divisible_by_eight((self.height // 4) * 3)
+            print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Recommend: {self.width // 4}x{self.height // 4} Correct in Outpaint pixels settings.")
+
+        self.mask_width = closest_upper_divisible_by_eight(np.clip(int(mask_width), self.width // 8, (self.width // 4) * 3))
+        self.mask_height = closest_upper_divisible_by_eight(np.clip(int(mask_height), self.width // 8, (self.width // 4) * 3))
 ##########################################################################################################################
 def outpaint_steps(
     width,

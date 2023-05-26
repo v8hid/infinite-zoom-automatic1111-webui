@@ -195,6 +195,19 @@ def lerp_imagemath_RGBA(img1, img2, alphaimg, factor:int = 50):
 def CMYKInvert(img) :
     return Image.merge(img.mode, [ImageOps.invert(b.convert('L')) for b in img.split()])
 
+def combine_masks(mask:Image, altmask:Image, width:int, height:int):
+    """
+    Combine two masks using lighter color
+    images are sized and cropped to standardized height and width
+    first image is converted to mode "1" (1-bit pixels, black and white, stored with one pixel per byte)
+    """
+    mask = resize_and_crop_image(mask, width, height).convert("L")
+    altmask = resize_and_crop_image(altmask, width, height).convert("L")
+    #mask.show()
+    #altmask.show()
+    result = ImageChops.lighter(mask, altmask)
+    return result
+
 def clip_gradient_image(gradient_image, min_value:int = 50, max_value:int =75, invert= False, mask = False):
     """
     Return only the values of a gradient grayscale image between a minimum and maximum value.
