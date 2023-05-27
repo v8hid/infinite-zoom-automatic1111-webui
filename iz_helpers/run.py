@@ -364,10 +364,34 @@ class InfZoomer:
         # all sizes EVEN
         for i,s in enumerate(scaling_steps):
             scaling_steps[i] = (s[0]+s[0]%2, s[1]+s[1]%2)
+            # ODD steps producing jumps. even steps on even resolution is what we need.
+            #scaling_steps[i] = (s[0]+1, s[1]+1)
 
         print(f"After EVEN: {scaling_steps}, length: {len(scaling_steps)}")
+
+
+        def calculate_differences(lst):
+            # Es wird eine leere Liste initialisiert, in der die Differenzen gespeichert werden
+            diff_lst = []
+
+            # Durchlaufen der Liste
+            for i in range(1, len(lst)):
+                # Differenz zwischen aufeinanderfolgenden Tupeln berechnen
+                diff = (lst[i][0]-lst[i-1][0], lst[i][1]-lst[i-1][1])
+                # Die Differenz zum diff_lst hinzufügen
+                diff_lst.append(diff)
+
+            return diff_lst
+
+        # Beispielliste von Tupeln
+        print(calculate_differences(scaling_steps))
+
+
+
+
+        print ("Ratios:")
         for s in scaling_steps:
-            print(f"Ratios: {str(s[0]/s[1])}",end=";")
+            print(f"{str(s[0]/s[1])}",end=";")
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
                                             self.cropCenterTo(current_image,(target_size)),
