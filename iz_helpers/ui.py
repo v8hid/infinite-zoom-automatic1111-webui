@@ -19,6 +19,7 @@ from .static_variables import (
     default_sampler,
     default_overmask,
     default_gradient_size,
+    default_outpaint_amount,
 )
 from .helpers import validatePromptJson_throws, putPrompts, clearPrompts, renumberDataframe
 from .prompt_util import readJsonPrompt
@@ -112,7 +113,7 @@ def on_ui_tabs():
                                 value=shared.opts.data.get("infzoom_outsizeW", 512),
                                 step=8,
                                 label="Output Width",
-                            )
+                            )                            
                             main_height = gr.Slider(
                                 minimum=16,
                                 maximum=2048,
@@ -244,11 +245,13 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                 with gr.Tab("Outpaint"):
                     outpaint_amount_px = gr.Slider(
                         label="Outpaint pixels",
-                        minimum=4,
-                        maximum=508,
+                        minimum=8,
+                        maximum=512,
                         step=8,
-                        value=188,
+                        value=default_outpaint_amount,
+                        elem_id="infzoom_outpaintAmount"
                     )
+                    main_width.change(get_min_outpaint_amount,inputs=[main_width, outpaint_amount_px],outputs=[outpaint_amount_px])
 
                     inpainting_mask_blur = gr.Slider(
                         label="Mask Blur",
@@ -263,6 +266,7 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                         maximum=64,
                         step=1,
                         value=default_overmask,
+                        elem_id="infzoom_outpaintOvermask"
                     )
                     inpainting_fill_mode = gr.Radio(
                         label="Masked content",
@@ -443,3 +447,7 @@ def checkPrompts(p):
 
 def get_filename(file):
     return file.name
+
+def get_min_outpaint_amount(width, outpaint_amount):
+    min_outpaint_px = max(outpaint_amount, width // 4)
+    return min_outpaint_px

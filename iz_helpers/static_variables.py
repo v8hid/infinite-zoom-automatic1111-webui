@@ -9,6 +9,7 @@ default_mask_blur = 48
 default_gradient_size = 61
 default_overmask = 8
 default_total_outpaints = 5
+default_outpaint_amount = 128
 promptTableHeaders = ["Outpaint Steps", "Prompt", "image location", "blend mask", "is keyframe"], ["number", "str", "str", "str", "bool"]
 
 default_prompt = """

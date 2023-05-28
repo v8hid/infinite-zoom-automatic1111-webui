@@ -3,10 +3,10 @@ import numpy as np
 from scipy.signal import savgol_filter
 from typing import Callable
 import cv2
-from PIL import Image, ImageFilter, ImageDraw, ImageColor
+from PIL import Image, ImageDraw, ImageColor
 from modules.ui import plaintext_to_html
 import modules.shared as shared
-from modules.processing import Processed, StableDiffusionProcessing
+#from modules.processing import Processed, StableDiffusionProcessing
 from modules.paths_internal import script_path
 from .helpers import (
     fix_env_Path_ffprobe,
@@ -237,7 +237,7 @@ class InfZoomer:
             current_image, 
             self.mask_width, self.mask_height, 
             overmask=self.C.overmask, 
-            radius=min(self.mask_height,self.mask_height)*0.2
+            radius=min(self.mask_width,self.mask_height)*0.2
         )
 
         new_width= masked_image.width
@@ -374,7 +374,7 @@ class InfZoomer:
                 current_image.copy(), 
                 self.mask_width, self.mask_height, 
                 overmask=self.C.overmask, 
-                radius=min(self.mask_height,self.mask_height)*0.875
+                radius=min(self.mask_width,self.mask_height)*0.875
             )
 
             current_image = shrink_and_paste_on_blank(
@@ -608,7 +608,7 @@ class InfZoomer:
                                 self.C.blend_image,
                                 self.C.blend_mode,
                                 self.C.blend_gradient_size,
-                                hex_to_rgba(self.C.blend_color))
+                                hex_to_rgba(self.C.blend_color))        
 
         for i in range(len(self.main_frames) - 1):
             # interpolation steps between 2 inpainted images (=sequential zoom and crop)
@@ -746,12 +746,12 @@ class InfZoomer:
         mask_width = self.mask_width
         mask_height = self.mask_height
         # set minimum mask size to 12.5% of the image size
-        if mask_width < self.width // 8:
+        if mask_width < closest_upper_divisible_by_eight(self.width // 8):
             mask_width = closest_upper_divisible_by_eight(self.width // 8)
             mask_height = closest_upper_divisible_by_eight(self.height // 8)
             print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Recommend: {self.width // 4}x{self.height // 4} Correct in Outpaint pixels settings.")
         # set maximum mask size to 75% of the image size
-        if mask_width > (self.width // 4) * 3:
+        if mask_width > closest_upper_divisible_by_eight((self.width // 4) * 3):
             mask_width = closest_upper_divisible_by_eight((self.width // 4) * 3)
             mask_height = closest_upper_divisible_by_eight((self.height // 4) * 3)
             print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Recommend: {self.width // 4}x{self.height // 4} Correct in Outpaint pixels settings.")
