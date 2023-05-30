@@ -234,7 +234,7 @@ class InfZoomer:
 
         # just 30 radius to get inpaint connected between outer and innter motive
         masked_image = create_mask_with_circles(
-            current_image, 
+            *current_image.size, 
             self.mask_width, self.mask_height, 
             overmask=self.C.overmask, 
             radius=min(self.mask_width,self.mask_height)*0.2
@@ -245,7 +245,7 @@ class InfZoomer:
 
         outpaint_steps=self.C.num_outpainting_steps
         for i in range(outpaint_steps):
-            print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(self.current_seed)}")
+            print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(self.current_seed)} \r")
             current_image = self.main_frames[-1]
 
             #keyframes are not outpainted
@@ -317,12 +317,12 @@ class InfZoomer:
                         print("using keyframe as exit image")
                     else:
                         # apply predefined or generated alpha mask to current image:
-                        current_image = apply_alpha_mask(current_image, self.getAlphaMask(current_image, i + 1))
+                        current_image = apply_alpha_mask(current_image, self.getAlphaMask(*current_image.size, i + 1))
                         self.main_frames.append(current_image)
                     self.save2Collect(current_image, f"key_frame_{i + 1}.png")                    
                 
             if paste_previous_image and i > 0:
-                current_image = apply_alpha_mask(self.main_frames[-1], self.getAlphaMask(self.main_frames[i + 1], i + 1))
+                current_image = apply_alpha_mask(self.main_frames[-1], self.getAlphaMask(*self.main_frames[i + 1].size, i + 1))
                 expanded_image.paste(current_image, (self.mask_width,self.mask_height))
                 zoomed_img = cv2_to_pil(cv2.resize(
                     pil_to_cv2(expanded_image),
@@ -364,28 +364,20 @@ class InfZoomer:
         processed = [] # list of processed images, in the event there is nothing to actually process
 
         self.fixMaskSizes()
-        
+
         for i in range(outpaint_steps):
                 
-            print (f"Outpaint step: {str(i + 1)} / {str(outpaint_steps)} Seed: {str(self.current_seed)}")
+            print (f"Outpaint step: {str(i + 1)} / {str(outpaint_steps)} Seed: {str(self.current_seed)} \r")
         
             current_image = self.main_frames[-1]
-            masked_image = create_mask_with_circles(
-                current_image.copy(), 
-                self.mask_width, self.mask_height, 
-                overmask=self.C.overmask, 
-                radius=min(self.mask_width,self.mask_height)*0.875
+
+            reduced_image = shrink_and_paste_on_blank(
+                current_image.copy(), self.mask_width , self.mask_height
             )
 
-            current_image = shrink_and_paste_on_blank(
-                current_image, self.mask_width , self.mask_height
-            )
-
-            mask_image = np.array(current_image)[:, :, 3]
+            mask_image = np.array(reduced_image)[:, :, 3]
             mask_image = Image.fromarray(255 - mask_image).convert("RGB")
-            mask_image = combine_masks(masked_image, mask_image, *mask_image.size)
-            #mask_image.show()
-            #input("mask image press enter to continue")
+            # create mask (black image with white mask_width width edges)
 
             #keyframes are not inpainted
             paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
@@ -406,6 +398,7 @@ class InfZoomer:
             else:
                 if self.prompt_images[max(k for k in self.prompt_images.keys() if k <= (i + 1))] == "":
                     pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
+
                     processed, seed = renderImg2Img(
                         f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
                         self.C.negative_prompt,
@@ -415,13 +408,13 @@ class InfZoomer:
                         -1, #self.current_seed,
                         self.width,
                         self.height,
-                        current_image,
+                        reduced_image,
                         mask_image,
                         self.C.inpainting_denoising_strength,
                         self.C.inpainting_mask_blur,
                         self.C.inpainting_fill_mode,
-                        self.C.inpainting_full_res,
-                        self.C.inpainting_padding,
+                        False, #self.C.inpainting_full_res,
+                        0 #self.C.inpainting_padding,
                     )
 
                     if len(processed.images) > 0:
@@ -440,7 +433,7 @@ class InfZoomer:
                         print("using keyframe as exit image")
                     else:
                         # apply predefined or generated alpha mask to current image:
-                        current_image = apply_alpha_mask(current_image, self.getAlphaMask(current_image, i + 1))
+                        current_image = apply_alpha_mask(current_image, self.getAlphaMask(*current_image.size, i + 1))
                         self.main_frames.append(current_image)
                     self.save2Collect(current_image, f"key_frame_{i + 1}.png")
 
@@ -451,17 +444,13 @@ class InfZoomer:
                 # apply predefined or generated alpha mask to current image: 
                 # current image must be redefined as most current image in frame stack
                 # use previous image alpha mask if available
-                current_image = apply_alpha_mask(self.main_frames[i + 1], self.getAlphaMask(self.main_frames[i + 1], i + 1))
+                current_image = apply_alpha_mask(self.main_frames[i + 1], self.getAlphaMask(*self.main_frames[i + 1].size, i + 1))
 
                 #handle previous image alpha layer
                 #prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
                 ## apply available alpha mask of previous image (inverted)
-                #if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (i))] != "":
-                #    prev_image_amask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (i))])
-                #else:
-                #    prev_image_gradient_ratio = (self.C.blend_gradient_size / 100)
-                #    prev_image_amask = draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.5)                
-                prev_image_amask = self.getAlphaMask(prev_image,i, False)
+           
+                prev_image_amask = self.getAlphaMask(self.width, self.height ,i, False)
                 #prev_image = apply_alpha_mask(prev_image, prev_image_amask, invert = True)
 
                 # merge previous image with current image
@@ -622,15 +611,8 @@ class InfZoomer:
                 interpol_image = current_image
                 self.save2Collect(interpol_image, f"interpol_img_{i}_{j}].png")
 
-                interpol_width = math.ceil(
-                    ( 1 - (1 - 2 * self.mask_width / self.width) **(1 - (j + 1) / self.num_interpol_frames) ) 
-                    * self.width / 2
-                )
-
-                interpol_height = math.ceil(
-                    ( 1 - (1 - 2 * self.mask_height / self.height) ** (1 - (j + 1) / self.num_interpol_frames) )
-                    * self.height/2
-                )
+                interpol_width, interpol_height, interpol_width2, interpol_height2 = self.getInterpol(j) # calculate interpolation values
+                print(f"\033[interpol_width, interpol_height, interpol_width2, interpol_height2: {interpol_width, interpol_height, interpol_width2, interpol_height2} \r")
 
                 interpol_image = interpol_image.crop(
                     (
@@ -645,16 +627,6 @@ class InfZoomer:
                 self.save2Collect(interpol_image, f"interpol_resize_{i}_{j}.png")
 
                 # paste the higher resolution previous image in the middle to avoid drop in quality caused by zooming
-                interpol_width2 = math.ceil(
-                    (1 - (self.width - 2 * self.mask_width) / (self.width - 2 * interpol_width))
-                    / 2 * self.width
-                )
-
-                interpol_height2 = math.ceil(
-                    (1 - (self.height - 2 * self.mask_height) / (self.height - 2 * interpol_height))
-                    / 2 * self.height
-                )
-
                 prev_image_fix_crop = shrink_and_paste_on_blank(
                     self.main_frames[i], interpol_width2, interpol_height2
                 )
@@ -729,271 +701,61 @@ class InfZoomer:
         bottom = (height + toSize[1])//2
         return im.crop((left, top, right, bottom))
 
-    def getAlphaMask(self,image, key, invert:bool = False):
+    def getAlphaMask(self, width, height, key, invert:bool = False):
         from PIL import ImageOps
 
         if self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if k <= (key))] != "":
             image_alpha_mask = open_image(self.prompt_alpha_mask_images[max(k for k in self.prompt_alpha_mask_images.keys() if  k <= (key))])
         else:
             image_gradient_ratio = (self.C.blend_gradient_size / 100)
-            image_alpha_mask = draw_gradient_ellipse(image.width, image.height, image_gradient_ratio, 0.0, 2.5)
+            image_alpha_mask = draw_gradient_ellipse(width, height, image_gradient_ratio, 0.0, 2.5)
         if invert:
             image_alpha_mask = ImageOps.invert(image_alpha_mask.convert('L'))
         return image_alpha_mask
+    
+    def getInterpol(self,j:int = 0):
+        interpol_width = math.ceil(
+        ( 1 - (1 - 2 * self.mask_width / self.width) **(1 - (j + 1) / self.num_interpol_frames) ) 
+            * self.width / 2
+        )
+
+        interpol_height = math.ceil(
+            ( 1 - (1 - 2 * self.mask_height / self.height) ** (1 - (j + 1) / self.num_interpol_frames) )
+            * self.height/2
+        )
+
+        interpol_width2 = math.ceil(
+            (1 - (self.width - 2 * self.mask_width) / (self.width - 2 * interpol_width))
+            / 2 * self.width
+        )
+
+        interpol_height2 = math.ceil(
+            (1 - (self.height - 2 * self.mask_height) / (self.height - 2 * interpol_height))
+            / 2 * self.height
+        )
+        return interpol_width, interpol_height, interpol_width2, interpol_height2
 
     def fixMaskSizes(self):
         # This is overkill, as it clips the values twice, but it's the easiest way to ensure the values are correct
         mask_width = self.mask_width
         mask_height = self.mask_height
         # set minimum mask size to 12.5% of the image size
-        if mask_width < closest_upper_divisible_by_eight(self.width // 8):
-            mask_width = closest_upper_divisible_by_eight(self.width // 8)
-            mask_height = closest_upper_divisible_by_eight(self.height // 8)
+        if mask_width < self.width // 8:
+            mask_width = self.width // 8
+            mask_height = self.height // 8
             print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Recommend: {self.width // 4}x{self.height // 4} Correct in Outpaint pixels settings.")
         # set maximum mask size to 75% of the image size
-        if mask_width > closest_upper_divisible_by_eight((self.width // 4) * 3):
-            mask_width = closest_upper_divisible_by_eight((self.width // 4) * 3)
-            mask_height = closest_upper_divisible_by_eight((self.height // 4) * 3)
+        if mask_width > (self.width // 4) * 3:
+            mask_width = (self.width // 4) * 3
+            mask_height = (self.height // 4) * 3
             print(f"\033[93m{self.mask_width}x{self.mask_height} set - used: {mask_width}x{mask_height} Recommend: {self.width // 4}x{self.height // 4} Correct in Outpaint pixels settings.")
 
-        self.mask_width = closest_upper_divisible_by_eight(np.clip(int(mask_width), self.width // 8, (self.width // 4) * 3))
-        self.mask_height = closest_upper_divisible_by_eight(np.clip(int(mask_height), self.width // 8, (self.width // 4) * 3))
+        #self.mask_width = np.clip(int(mask_width), self.width // 8, (self.width // 4) * 3)
+        #self.mask_height = np.clip(int(mask_height), self.width // 8, (self.width // 4) * 3)
 ##########################################################################################################################
-def outpaint_steps(
-    width,
-    height,
-    common_prompt_pre,
-    common_prompt_suf,
-    prompts,
-    prompt_images,
-    prompt_alpha_mask_images,
-    prompt_image_is_keyframe,
-    negative_prompt,
-    seed,
-    sampler,
-    num_inference_steps,
-    guidance_scale,
-    inpainting_denoising_strength,
-    inpainting_mask_blur,
-    inpainting_fill_mode,
-    inpainting_full_res,
-    inpainting_padding,
-    init_img,
-    outpaint_steps,
-    out_config,
-    mask_width,
-    mask_height,
-    custom_exit_image,
-    frame_correction=True,  # TODO: add frame_Correction in UI
-    blend_gradient_size = 61
-):
-    main_frames = [init_img.convert("RGBA")]
-    prev_image = init_img.convert("RGBA")
-    exit_img = custom_exit_image.convert("RGBA") if custom_exit_image else None
 
-    for i in range(outpaint_steps):
-        print_out = (
-            "Outpaint step: "
-            + str(i + 1)
-            + " / "
-            + str(outpaint_steps)
-            + " Seed: "
-            + str(seed)
-        )
-        print(print_out)
-
-        current_image = main_frames[-1]
-
-        # shrink image to mask size
-        current_image = shrink_and_paste_on_blank(
-            current_image, mask_width, mask_height
-        )
-
-        mask_image = np.array(current_image)[:, :, 3]
-        mask_image = Image.fromarray(255 - mask_image)        
-        # create mask (black image with white mask_width width edges)
-
-        #keyframes are not inpainted
-        paste_previous_image = not prompt_image_is_keyframe[(i + 1)]
-        print(f"paste_prev_image: {paste_previous_image} {i} {i + 1}")
-
-        if custom_exit_image and ((i + 1) == outpaint_steps):
-            current_image = resize_and_crop_image(custom_exit_image, width, height).convert("RGBA")
-            exit_img = current_image
-            print("using Custom Exit Image")
-            save2Collect(current_image, out_config, f"exit_img.png")
-
-            paste_previous_image = False
-        else:
-            if prompt_images[max(k for k in prompt_images.keys() if k <= (i + 1))] == "":
-                pr = prompts[max(k for k in prompts.keys() if k <= i)]
-                processed, seed = renderImg2Img(
-                    f"{common_prompt_pre}\n{pr}\n{common_prompt_suf}".strip(),
-                    negative_prompt,
-                    sampler,
-                    int(num_inference_steps),
-                    guidance_scale,
-                    seed,
-                    width,
-                    height,
-                    current_image,
-                    mask_image,
-                    inpainting_denoising_strength,
-                    inpainting_mask_blur,
-                    inpainting_fill_mode,
-                    inpainting_full_res,
-                    inpainting_padding,
-                )
-                if len(processed.images) > 0:
-                    main_frames.append(processed.images[0].convert("RGBA"))
-                    save2Collect(processed.images[0], out_config, f"outpain_step_{i}.png")
-
-                #paste_previous_image = True
-            else:
-                # use prerendered image, known as keyframe. Resize to target size
-                print(f"image {i + 1} is a keyframe: {not paste_previous_image}")
-                current_image = open_image(prompt_images[(i + 1)])
-                current_image = resize_and_crop_image(current_image, width, height).convert("RGBA")
-
-                # if keyframe is last frame, use it as exit image
-                if (not paste_previous_image) and ((i + 1) == outpaint_steps):
-                    exit_img = current_image
-                    print("using keyframe as exit image")
-                else:
-                    # apply predefined or generated alpha mask to current image:
-                    if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-                        current_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))])
-                    else:
-                        current_image_gradient_ratio = (blend_gradient_size / 100)
-                        current_image_amask = draw_gradient_ellipse(current_image.width, current_image.height, current_image_gradient_ratio, 0.0, 2.5)
-                    current_image = apply_alpha_mask(current_image, current_image_amask)
-                    main_frames.append(current_image)
-                save2Collect(current_image, out_config, f"key_frame_{i + 1}.png")
-
-        #seed = newseed
-        # TODO: seed behavior
-
-        # paste current image with alpha layer on previous image to merge : paste on i         
-        if paste_previous_image and i > 0:
-            # apply predefined or generated alpha mask to current image: 
-            # current image must be redefined as most current image in frame stack
-            # use previous image alpha mask if available
-            if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i + 1))] != "":
-                current_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i + 1))])
-            else:
-                current_image_gradient_ratio = (blend_gradient_size / 100)
-                current_image_amask = draw_gradient_ellipse(main_frames[i + 1].width, main_frames[i + 1].height, current_image_gradient_ratio, 0.0, 2.5)
-            current_image = apply_alpha_mask(main_frames[i + 1], current_image_amask)
-
-            #handle previous image alpha layer
-            #prev_image = (main_frames[i] if main_frames[i] else main_frames[0])
-            ## apply available alpha mask of previous image (inverted)
-            if prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if k <= (i))] != "":
-                prev_image_amask = open_image(prompt_alpha_mask_images[max(k for k in prompt_alpha_mask_images.keys() if  k <= (i))])
-            else:
-                prev_image_gradient_ratio = (blend_gradient_size / 100)
-                prev_image_amask = draw_gradient_ellipse(prev_image.width, prev_image.height, prev_image_gradient_ratio, 0.0, 2.5)
-            #prev_image = apply_alpha_mask(prev_image, prev_image_amask, invert = True)
-
-            # merge previous image with current image
-            corrected_frame = crop_inner_image(
-                current_image, mask_width, mask_height
-            )
-            prev = Image.new(prev_image.mode, (width, height), (255,255,255,255))
-            prev.paste(apply_alpha_mask(main_frames[i], prev_image_amask))
-            corrected_frame.paste(prev, mask=prev)
-                
-            main_frames[i] = corrected_frame
-            save2Collect(corrected_frame, out_config, f"main_frame_gradient_{i + 0}")
-            
-    if exit_img is not None:
-        main_frames.append(exit_img)
-
-    return main_frames, processed
-
-
-def create_zoom(
-    common_prompt_pre,
-    prompts_array,
-    common_prompt_suf,
-    negative_prompt,
-    num_outpainting_steps,
-    guidance_scale,
-    num_inference_steps,
-    custom_init_image,
-    custom_exit_image,
-    video_frame_rate,
-    video_zoom_mode,
-    video_start_frame_dupe_amount,
-    video_last_frame_dupe_amount,
-    video_ffmpeg_opts,
-    inpainting_mask_blur,
-    inpainting_fill_mode,
-    zoom_speed,
-    seed,
-    outputsizeW,
-    outputsizeH,
-    batchcount,
-    sampler,
-    upscale_do,
-    upscaler_name,
-    upscale_by,
-    overmask,
-    outpaintStrategy,
-    outpaint_amount_px,
-    blend_image,
-    blend_mode,
-    blend_gradient_size,
-    blend_invert_do,
-    blend_color:tuple[int, int, int, int] = (255,255, 0, 255),
-    audio_filename=None,
-    inpainting_denoising_strength=1,
-    inpainting_full_res=0,
-    inpainting_padding=0,
-    progress=None,    
-):
-    for i in range(batchcount):
-        print(f"Batch {i+1}/{batchcount}")
-        result = create_zoom_single(
-            common_prompt_pre,
-            prompts_array,
-            common_prompt_suf,
-            negative_prompt,
-            num_outpainting_steps,
-            guidance_scale,
-            int(num_inference_steps),
-            custom_init_image,
-            custom_exit_image,
-            video_frame_rate,
-            video_zoom_mode,
-            video_start_frame_dupe_amount,
-            video_last_frame_dupe_amount,
-            inpainting_mask_blur,
-            inpainting_fill_mode,
-            zoom_speed,
-            seed,
-            outputsizeW,
-            outputsizeH,
-            sampler,
-            upscale_do,
-            upscaler_name,
-            upscale_by,
-            overmask,
-            outpaintStrategy,
-            outpaint_amount_px,
-            blend_image,
-            blend_mode,
-            blend_gradient_size,
-            blend_invert_do,
-            blend_color,
-            inpainting_denoising_strength,
-            inpainting_full_res,
-            inpainting_padding,
-            progress,
-            audio_filename
-        )
-    return result
-
+##########################################################################################################################
+# Infinite Zoom
 
 def prepare_output_path():
     isCollect = shared.opts.data.get("infzoom_collectAllResources", False)
@@ -1309,10 +1071,10 @@ def create_zoom_single(
         plaintext_to_html(""),
     )
 #################################################################################################################
-def create_mask_with_circles(original_image, border_width, border_height, overmask: int, radius=4):
+def create_mask_with_circles(original_image_width, original_image_height, border_width, border_height, overmask: int, radius=4):
     # Create a new image with border and draw a mask
-    new_width = original_image.width + 2 * border_width
-    new_height = original_image.height + 2 * border_height
+    new_width = original_image_width + 2 * border_width
+    new_height = original_image_height + 2 * border_height
 
     # Create new image, default is black
     mask = Image.new('RGB', (new_width, new_height), 'white')
@@ -1337,9 +1099,6 @@ def create_mask_with_circles(original_image, border_width, border_height, overma
     for coord in circle_coords:
         draw.ellipse([coord[0] - radius, coord[1] - radius, coord[0] + radius, coord[1] + radius], fill='white')
     return mask
-
-
-
 
 
 def pil_to_cv2(image):

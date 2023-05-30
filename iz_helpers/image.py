@@ -9,7 +9,7 @@ from modules.processing import apply_overlay, slerp
 from timeit import default_timer as timer
 
 
-def shrink_and_paste_on_blank(current_image, mask_width, mask_height):
+def shrink_and_paste_on_blank(current_image, mask_width, mask_height, blank_color:tuple[int, int, int, int] = (0,0,0,0)):
     """
     Decreases size of current_image by mask_width pixels from each side,
     then adds a mask_width width transparent frame,
@@ -21,12 +21,12 @@ def shrink_and_paste_on_blank(current_image, mask_width, mask_height):
 
     # calculate new dimensions
     width, height = current_image.size
-    new_width = width - 2 * mask_width
-    new_height = height - 2 * mask_height
+    new_width = width - (2 * mask_width)
+    new_height = height - (2 * mask_height)
 
     # resize and paste onto blank image
     prev_image = current_image.resize((new_width, new_height))
-    blank_image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    blank_image = Image.new("RGBA", (width, height), blank_color)
     blank_image.paste(prev_image, (mask_width, mask_height))
 
     return blank_image
@@ -595,11 +595,17 @@ def crop_inner_image(image: Image, width_offset: int, height_offset: int) -> Ima
 
     # Crop the image to the center using the specified offsets
     cropped_image = image.crop(
+        #(
+        #    center_x - width_offset,
+        #    center_y - height_offset,
+        #    center_x + width_offset,
+        #    center_y + height_offset,
+        #)
         (
-            center_x - width_offset,
-            center_y - height_offset,
-            center_x + width_offset,
-            center_y + height_offset,
+            width_offset,
+            height_offset,
+            width - width_offset,
+            height - height_offset,
         )
     )
 

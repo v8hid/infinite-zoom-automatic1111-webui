@@ -1,7 +1,6 @@
 import json
 from msilib.schema import File
 import gradio as gr
-from .run import create_zoom
 import modules.shared as shared
 from webui import wrap_gradio_gpu_call
 from modules.ui import create_output_panel
@@ -21,7 +20,7 @@ from .static_variables import (
     default_gradient_size,
     default_outpaint_amount,
 )
-from .helpers import validatePromptJson_throws, putPrompts, clearPrompts, renumberDataframe
+from .helpers import validatePromptJson_throws, putPrompts, clearPrompts, renumberDataframe, closest_upper_divisible_by_eight
 from .prompt_util import readJsonPrompt
 from .static_variables import promptTableHeaders
 
@@ -251,7 +250,6 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                         value=default_outpaint_amount,
                         elem_id="infzoom_outpaintAmount"
                     )
-                    main_width.change(get_min_outpaint_amount,inputs=[main_width, outpaint_amount_px],outputs=[outpaint_amount_px])
 
                     inpainting_mask_blur = gr.Slider(
                         label="Mask Blur",
@@ -279,8 +277,10 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                         label="Outpaint Strategy",
                         choices=["Center", "Corners"],
                         value="Corners",
-                        type="value" 
+                        type="value",
+                        elem_id="infzoom_outpaintStrategy"
                     )
+                    main_width.change(get_min_outpaint_amount,inputs=[main_width, outpaint_amount_px, outpaintStrategy],outputs=[outpaint_amount_px])
 
 
 
@@ -448,6 +448,9 @@ def checkPrompts(p):
 def get_filename(file):
     return file.name
 
-def get_min_outpaint_amount(width, outpaint_amount):
-    min_outpaint_px = max(outpaint_amount, width // 4)
+def get_min_outpaint_amount(width, outpaint_amount, strategy):
+    #automatically sets the minimum outpaint amount based on the width for Center strategy
+    min_outpaint_px = outpaint_amount
+    if strategy == "Center":
+        min_outpaint_px = closest_upper_divisible_by_eight(max(outpaint_amount, width // 4))
     return min_outpaint_px
