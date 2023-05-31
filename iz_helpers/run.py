@@ -230,6 +230,9 @@ class InfZoomer:
     
 
     def outpaint_steps_cornerStrategy(self):
+        # Surn: making an assumption that self.outerZoom is this process and it was intended that FALSE was going to be the classic (center) strategy
+        # i represents the current frame
+        # i + 1 represents the frame just appended to the main_frames list
         current_image = self.main_frames[-1]
 
         # just 30 radius to get inpaint connected between outer and innter motive
@@ -237,7 +240,7 @@ class InfZoomer:
             *current_image.size, 
             self.mask_width, self.mask_height, 
             overmask=self.C.overmask, 
-            radius=min(self.mask_width,self.mask_height)*0.2
+            radius=min(self.mask_width,self.mask_height)*0.25
         )
 
         new_width= masked_image.width
@@ -247,6 +250,7 @@ class InfZoomer:
         for i in range(outpaint_steps):
             print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(self.current_seed)} \r")
             current_image = self.main_frames[-1]
+            alpha_mask = self.getAlphaMask(*current_image.size, i + 1)
 
             #keyframes are not outpainted
             paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
@@ -260,8 +264,8 @@ class InfZoomer:
                     )
                 )
                 
-                if 0 == self.outerZoom:
-                    exit_img = current_image.convert("RGB")
+                #if 0 == self.outerZoom:
+                exit_img = current_image.convert("RGBA")
 
                 self.save2Collect(current_image, self.out_config, f"exit_img.png")
                 paste_previous_image = False
@@ -304,6 +308,9 @@ class InfZoomer:
                             interpolation=cv2.INTER_AREA
                             )
                         )
+                        if not paste_previous_image:
+                            zoomed_img = apply_alpha_mask(zoomed_img, alpha_mask)
+                            self.main_frames.append(zoomed_img)
                     #
                 else:
                     # use prerendered image, known as keyframe. Resize to target size
@@ -321,8 +328,8 @@ class InfZoomer:
                         self.main_frames.append(current_image)
                     self.save2Collect(current_image, f"key_frame_{i + 1}.png")                    
                 
-            if paste_previous_image and i > 0:
-                current_image = apply_alpha_mask(self.main_frames[-1], self.getAlphaMask(*self.main_frames[i + 1].size, i + 1))
+            if paste_previous_image and i > 0:               
+                current_image = apply_alpha_mask(self.main_frames[-1], alpha_mask)
                 expanded_image.paste(current_image, (self.mask_width,self.mask_height))
                 zoomed_img = cv2_to_pil(cv2.resize(
                     pil_to_cv2(expanded_image),
@@ -332,7 +339,7 @@ class InfZoomer:
                 )
                         
                 if self.outerZoom:
-                    self.main_frames[-1] = expanded_image # replace small image
+                    self.main_frames[-1] = apply_alpha_mask(expanded_image, alpha_mask)  # replace small image
                     self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
                         
                     if (i < outpaint_steps-1):
@@ -345,7 +352,7 @@ class InfZoomer:
                             interpolation=cv2.INTER_AREA
                         )
                     )
-                    self.main_frames.append(zoomed_img)
+                    self.main_frames.append(apply_alpha_mask(zoomed_img, alpha_mask))
                     processed.images[0]=self.main_frames[-1]
                     self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
 
@@ -488,8 +495,8 @@ class InfZoomer:
         #frames reversed and sorted prior to interpolation
 
         #if 0 == self.C.video_zoom_mode:
-        current_image = self.start_frames[0]
-        next_image = self.start_frames[1]
+        current_image = self.start_frames[0].convert("RGBA")
+        next_image = self.start_frames[1].convert("RGBA")
         #elif 1 == self.C.video_zoom_mode:
         #    current_image = self.main_frames[-1]
         #    next_image = self.main_frames[-2]
@@ -523,8 +530,8 @@ class InfZoomer:
 
         for i in range(len(self.main_frames)):
 
-            current_image = self.main_frames[0+i]
-            previous_image = self.main_frames[i-1]
+            current_image = self.main_frames[0+i].convert("RGBA")
+            previous_image = self.main_frames[i-1].convert("RGBA")
 
             lastFrame =  apply_alpha_mask(self.cropCenterTo(current_image.copy(),target_size),current_image.split()[3])
              
@@ -612,7 +619,7 @@ class InfZoomer:
                 self.save2Collect(interpol_image, f"interpol_img_{i}_{j}].png")
 
                 interpol_width, interpol_height, interpol_width2, interpol_height2 = self.getInterpol(j) # calculate interpolation values
-                print(f"\033[interpol_width, interpol_height, interpol_width2, interpol_height2: {interpol_width, interpol_height, interpol_width2, interpol_height2} \r")
+                #print(f"\033[interpol_width, interpol_height, interpol_width2, interpol_height2: {interpol_width, interpol_height, interpol_width2, interpol_height2} \r")
 
                 interpol_image = interpol_image.crop(
                     (
@@ -711,7 +718,7 @@ class InfZoomer:
             image_alpha_mask = draw_gradient_ellipse(width, height, image_gradient_ratio, 0.0, 2.5)
         if invert:
             image_alpha_mask = ImageOps.invert(image_alpha_mask.convert('L'))
-        return image_alpha_mask
+        return image_alpha_mask.convert('L')
     
     def getInterpol(self,j:int = 0):
         interpol_width = math.ceil(
