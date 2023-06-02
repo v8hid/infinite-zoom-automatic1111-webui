@@ -694,7 +694,7 @@ def blend_images(start_image: Image, stop_image: Image, num_frames: int, invert:
     # Return the list of blended frames
     return blended_frames
 
-def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Image, num_frames: int, invert:bool = False) -> list:
+def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Image, num_frames: int, invert:bool = False, softness=0.2) -> list:
     """
     Blend two images together by using the gray image as the alpha amount of each frame.
     This function takes in three parameters:
@@ -834,7 +834,7 @@ def alpha_composite_images(start_image: Image, stop_image: Image, gray_image: Im
 
 #result_img = , 0.25, False, 0.1, 0.01, 0.01))
 #list(np.divide((255,255,245,225),255))
-def PSLumaWipe2(a_color, b_color, luma, l_color=(255, 255, 0, 255), progress=0.0, invert=False, softness=1.0, start_adjust = 0.1, stop_adjust = 0.1):    
+def PSLumaWipe2(a_color, b_color, luma, l_color=(255, 255, 0, 255), progress=0.0, invert=False, softness=0.2, start_adjust = 0.1, stop_adjust = 0.1):    
     # luma is now an image file
     # color is now a color image file that is merged with approaching b_color image
     # the entire frame is built based upon progress

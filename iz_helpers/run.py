@@ -119,11 +119,11 @@ class InfZoomer:
 
         #trim frames that are blended or luma wiped
         if (self.C.blend_mode != 0):
-            #trim first and last frames only from main_frames, store 2 frames in each start_frames and end_frames
+            #trim first and last frames only from main_frames, store 2 frames in each start_frames and end_frames for blending
             self.start_frames = self.main_frames[:2]
             self.end_frames = self.main_frames[(len(self.main_frames) - 2):]
             self.main_frames = self.main_frames[1:-1]
-            print(f"Trimming frames: start_frames:{len(self.start_frames)} end_frames:{len(self.end_frames)} main_frames:{len(self.main_frames)}")
+            print(f"Trimmed Blending Mode frames: start_frames:{len(self.start_frames)} end_frames:{len(self.end_frames)} main_frames:{len(self.main_frames)}")
 
         if (self.C.upscale_do): 
             self.doUpscaling()
@@ -134,6 +134,7 @@ class InfZoomer:
         #    self.start_frames = self.end_frames[::-1]
         #    self.end_frames = self.start_frames_temp
         #    self.start_frames_temp = None
+        # This was not needed due to ffmpeg -vf reverse
 
         if not self.outerZoom:
             self.contVW = ContinuousVideoWriter(
@@ -240,7 +241,7 @@ class InfZoomer:
             *current_image.size, 
             self.mask_width, self.mask_height, 
             overmask=self.C.overmask, 
-            radius=min(self.mask_width,self.mask_height)*0.25
+            radius=min(self.mask_width,self.mask_height)*0.5
         )
 
         new_width= masked_image.width
@@ -280,6 +281,7 @@ class InfZoomer:
 
                     #expanded_image = Image.new("RGB",(new_width,new_height),"black")
                     expanded_image.paste(current_image, (self.mask_width,self.mask_height))
+                    expanded_image = apply_alpha_mask(expanded_image, alpha_mask)
                     pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
                 
                     processed, newseed = renderImg2Img(
@@ -308,8 +310,8 @@ class InfZoomer:
                             interpolation=cv2.INTER_AREA
                             )
                         )
-                        if not paste_previous_image:
-                            zoomed_img = apply_alpha_mask(zoomed_img, alpha_mask)
+                        zoomed_img = apply_alpha_mask(zoomed_img, alpha_mask)
+                        if not paste_previous_image:                            
                             self.main_frames.append(zoomed_img)
                     #
                 else:
@@ -320,7 +322,7 @@ class InfZoomer:
 
                     # if keyframe is last frame, use it as exit image
                     if (not paste_previous_image) and ((i + 1) == outpaint_steps):
-                        exit_img = current_image
+                        exit_img = current_image.convert("RGBA")
                         print("using keyframe as exit image")
                     else:
                         # apply predefined or generated alpha mask to current image:
@@ -339,11 +341,11 @@ class InfZoomer:
                 )
                         
                 if self.outerZoom:
-                    self.main_frames[-1] = apply_alpha_mask(expanded_image, alpha_mask)  # replace small image
+                    self.main_frames[-1] = apply_alpha_mask(expanded_image, self.getAlphaMask(*expanded_image.size, i))  # replace small image
                     self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
                         
                     if (i < outpaint_steps-1):
-                        self.main_frames.append(zoomed_img)   # prepare next frame with former content
+                        self.main_frames.append(apply_alpha_mask(zoomed_img, alpha_mask))   # prepare next frame with former content
 
                 else:
                     zoomed_img = cv2_to_pil(cv2.resize(
@@ -355,6 +357,9 @@ class InfZoomer:
                     self.main_frames.append(apply_alpha_mask(zoomed_img, alpha_mask))
                     processed.images[0]=self.main_frames[-1]
                     self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
+            
+            self.main_frames[-1] = apply_alpha_mask(self.main_frames[-1], alpha_mask)
+            
 
         if exit_img is not None:
             self.main_frames.append(exit_img)
@@ -491,8 +496,13 @@ class InfZoomer:
 
    
     def interpolateFramesOuterZoom(self):
-
-        #frames reversed and sorted prior to interpolation
+        blend_invert = self.C.blend_invert_do
+        
+        if self.C.video_zoom_mode:
+            self.C.video_ffmpeg_opts += "-vf reverse"
+            # note worked in video tab for ffmpeg expert mode: -vf lutyuv=u='(val-maxval/2)*2+maxval/2':v='(val-maxval/2)*2+maxval/2'
+            # this may mean that if -vf is used in expert mode, we need to add reverse with a comma in the -vf argument
+            blend_invert = not self.C.blend_invert_do   
 
         #if 0 == self.C.video_zoom_mode:
         current_image = self.start_frames[0].convert("RGBA")
@@ -522,21 +532,22 @@ class InfZoomer:
                                             apply_alpha_mask(self.cropCenterTo(next_image.copy(),(target_size)),next_image.split()[3]),
                                             self.C.video_frame_rate,int(self.C.video_start_frame_dupe_amount-1),
                                             self.C.video_ffmpeg_opts,
-                                            self.C.blend_invert_do,
+                                            blend_invert,
                                             self.C.blend_image,
                                             self.C.blend_mode,
                                             self.C.blend_gradient_size,
                                             hex_to_rgba(self.C.blend_color))
 
-        for i in range(len(self.main_frames)):
-
+        # Build interpolation frames
+        # last frame skip interpolation
+        for i in range(len(self.main_frames) - 1):            
             current_image = self.main_frames[0+i].convert("RGBA")
             previous_image = self.main_frames[i-1].convert("RGBA")
 
             lastFrame =  apply_alpha_mask(self.cropCenterTo(current_image.copy(),target_size),current_image.split()[3])
              
             self.contVW.append([lastFrame])
-
+            
             cv2_image = pil_to_cv2(current_image)
 
             # Resize and crop using OpenCV2
@@ -552,6 +563,9 @@ class InfZoomer:
                 
                 self.contVW.append([cropped_image_pil])
                 lastFrame = cropped_image_pil
+
+        # process last frame
+        self.contVW.append([self.main_frames[-1]])
 
         # process last frames
         lastFrame = self.end_frames[1]
@@ -588,7 +602,8 @@ class InfZoomer:
         """
 
     def interpolateFramesSmallCenter(self):
-        #frames reversed and resorted prior to interpolation
+        blend_invert = self.C.blend_invert_do  
+        
         if self.C.video_zoom_mode:
             self.C.video_ffmpeg_opts += "-vf reverse"
             # note worked in video tab for ffmpeg expert mode: -vf lutyuv=u='(val-maxval/2)*2+maxval/2':v='(val-maxval/2)*2+maxval/2'
