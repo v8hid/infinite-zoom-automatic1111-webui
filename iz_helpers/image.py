@@ -647,6 +647,13 @@ def multiply_alpha(image, factor):
     start = timer()
     # Convert the image to a numpy array
     np_image = np.array(image)
+
+    # Check image mode and convert to RGBA if necessary
+    if np_image.ndim == 2:  # Mode 'L'
+        np_image = np.repeat(np_image[:, :, np.newaxis], 4, axis=2)
+    elif np_image.ndim == 3 and np_image.shape[2] == 1:  # Mode '1'
+        np_image = np.repeat(np_image, 4, axis=2)
+
     # Extract the alpha channel from the image
     alpha = np_image[:, :, 3].astype(float)
     # Multiply the alpha channel by the given factor
