@@ -350,143 +350,7 @@ class InfZoomer:
             self.main_frames.append(exit_img)
 
         return processed
-    def outpaint_steps_cornerStrategy_new(self):
-        # Surn: making an assumption that self.outerZoom is this process and it was intended that FALSE was going to be the classic (center) strategy
-        # i represents the current frame
-        # i + 1 represents the frame just appended to the main_frames list
-        current_image = self.main_frames[-1]
-
-        # just 30 radius to get inpaint connected between outer and innter motive
-        masked_image = create_mask_with_circles(
-            *current_image.size, 
-            self.mask_width, self.mask_height, 
-            overmask=self.C.overmask, 
-            radius=min(self.mask_width,self.mask_height)*0.5
-        )
-
-        new_width= masked_image.width
-        new_height=masked_image.height
-
-        outpaint_steps=self.C.num_outpainting_steps
-        for i in range(outpaint_steps):
-            print (f"Outpaint step: {str(i + 1)}/{str(outpaint_steps)} Seed: {str(self.current_seed)} \r")
-            current_image = self.main_frames[-1]
-            alpha_mask = self.getAlphaMask(*current_image.size, i + 1)
-
-            #keyframes are not outpainted
-            paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
-            print(f"paste_prev_image: {paste_previous_image} {i} {i + 1}")
-
-            if self.C.custom_exit_image and ((i + 1) == outpaint_steps):
-                current_image = cv2_to_pil(cv2.resize(
-                    pil_to_cv2(self.C.custom_exit_image),
-                    (self.C.width, self.C.height), 
-                    interpolation=cv2.INTER_AREA
-                    )
-                )
-                
-                #if 0 == self.outerZoom:
-                exit_img = current_image.convert("RGBA")
-
-                self.save2Collect(current_image, self.out_config, f"exit_img.png")
-                paste_previous_image = False
-            else:
-                if self.prompt_images[max(k for k in self.prompt_images.keys() if k <= (i + 1))] == "":
-                    expanded_image = cv2_to_pil(
-                        cv2.resize(pil_to_cv2(current_image),
-                                 (new_width,new_height),
-                                 interpolation=cv2.INTER_AREA
-                        )
-                    )
-
-                    #expanded_image = Image.new("RGB",(new_width,new_height),"black")
-                    expanded_image.paste(current_image, (self.mask_width,self.mask_height))
-                    expanded_image = apply_alpha_mask(expanded_image, alpha_mask)
-                    pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
-                
-                    processed, newseed = renderImg2Img(
-                        f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
-                        self.C.negative_prompt,
-                        self.C.sampler,
-                        self.C.num_inference_steps,
-                        self.C.guidance_scale,
-                        -1, # try to avoid massive repeatings: self.current_seed,
-                        new_width,  #outpaintsizeW
-                        new_height,  #outpaintsizeH
-                        expanded_image,
-                        masked_image,
-                        self.C.inpainting_denoising_strength,
-                        self.C.inpainting_mask_blur,
-                        self.C.inpainting_fill_mode,
-                        False, # self.C.inpainting_full_res,
-                        self.C.inpainting_padding,
-                    )
-
-                    if len(processed.images) > 0:
-                        expanded_image = processed.images[0]
-                        zoomed_img = cv2_to_pil(cv2.resize(
-                            pil_to_cv2(expanded_image),
-                            (self.width,self.height), 
-                            interpolation=cv2.INTER_AREA
-                            )
-                        )
-                        zoomed_img = apply_alpha_mask(zoomed_img, alpha_mask)
-                        if not paste_previous_image:                            
-                            self.main_frames.append(zoomed_img)
-                    #
-                else:
-                    # use prerendered image, known as keyframe. Resize to target size
-                    print(f"image {i + 1} is a keyframe: {not paste_previous_image}")
-                    current_image = open_image(self.prompt_images[(i + 1)])
-                    current_image = resize_and_crop_image(current_image, self.width, self.height)
-                    current_image = apply_alpha_mask(current_image, self.getAlphaMask(*current_image.size, i + 1))
-
-                    # if keyframe is last frame, use it as exit image
-                    if (not paste_previous_image) and ((i + 1) == outpaint_steps):
-                        exit_img = current_image
-                        print("using keyframe as exit image")
-                    else:
-                        # apply predefined or generated alpha mask to current image:
-                        #current_image = apply_alpha_mask(current_image, self.getAlphaMask(*current_image.size, i + 1))
-                        self.main_frames.append(current_image)
-                    self.save2Collect(current_image, f"key_frame_{i + 1}.png")                    
-                
-            if paste_previous_image and i > 0:               
-                current_image = apply_alpha_mask(self.main_frames[-1], alpha_mask)
-                expanded_image.paste(current_image, (self.mask_width,self.mask_height))
-                zoomed_img = cv2_to_pil(cv2.resize(
-                    pil_to_cv2(expanded_image),
-                    (self.width,self.height), 
-                    interpolation=cv2.INTER_AREA
-                    )
-                )
-                        
-                if self.outerZoom:
-                    self.main_frames[-1] = apply_alpha_mask(expanded_image, self.getAlphaMask(*expanded_image.size, i), False)  # replace small image
-                    self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
-                        
-                    if (i < outpaint_steps-1):
-                        self.main_frames.append(apply_alpha_mask(zoomed_img, alpha_mask, False))   # prepare next frame with former content
-
-                else:
-                    zoomed_img = cv2_to_pil(cv2.resize(
-                            expanded_image,
-                            (self.width,self.height),
-                            interpolation=cv2.INTER_AREA
-                        )
-                    )
-                    self.main_frames.append(apply_alpha_mask(zoomed_img, alpha_mask))
-                    processed.images[0]=self.main_frames[-1]
-                    self.save2Collect(processed.images[0], f"outpaint_step_{i}.png")
-            
-            self.main_frames[-1] = apply_alpha_mask(self.main_frames[-1],  multiply_alpha(alpha_mask, 0.25))            
-
-        if exit_img is not None:
-            self.main_frames.append(exit_img)
-
-        return processed
-    
-
+   
     def outpaint_steps_v8hid(self):
 
         prev_image = self.main_frames[0].convert("RGBA")
@@ -613,8 +477,7 @@ class InfZoomer:
         scaling_steps = [(round(width - i * width_step), round(height - i * height_step)) for i in range(1,steps+1)]
         #scaling_steps.insert(0,original_size) # initial size is in the list
         return scaling_steps
-
-   
+       
     def interpolateFramesOuterZoom(self):
         blend_invert = self.C.blend_invert_do
         
@@ -642,10 +505,34 @@ class InfZoomer:
         # all sizes EVEN
         for i,s in enumerate(scaling_steps):
             scaling_steps[i] = (s[0]+s[0]%2, s[1]+s[1]%2)
+            # ODD steps producing jumps. even steps on even resolution is what we need.
+            #scaling_steps[i] = (s[0]+1, s[1]+1)
 
         print(f"After EVEN: {scaling_steps}, length: {len(scaling_steps)}")
+
+
+        def calculate_differences(lst):
+            # Es wird eine leere Liste initialisiert, in der die Differenzen gespeichert werden
+            diff_lst = []
+
+            # Durchlaufen der Liste
+            for i in range(1, len(lst)):
+                # Differenz zwischen aufeinanderfolgenden Tupeln berechnen
+                diff = (lst[i][0]-lst[i-1][0], lst[i][1]-lst[i-1][1])
+                # Die Differenz zum diff_lst hinzuf�gen
+                diff_lst.append(diff)
+
+            return diff_lst
+
+        # Beispielliste von Tupeln
+        print(calculate_differences(scaling_steps))
+
+
+
+
+        print ("Ratios:")
         for s in scaling_steps:
-            print(f"Ratios: {str(s[0]/s[1])}",end=";")
+            print(f"{str(s[0]/s[1])}",end=";")
 
         self.contVW = ContinuousVideoWriter(self.out_config["video_filename"], 
                                             self.cropCenterTo(current_image.copy(),(target_size)),
