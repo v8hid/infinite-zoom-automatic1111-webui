@@ -27,7 +27,7 @@ from .static_variables import promptTableHeaders
 
 def on_ui_tabs():
     main_seed = gr.Number()
-    audio_filename = gr.Textbox(None)
+    audio_filename = gr.Textbox(None)    
 
     with gr.Blocks(analytics_enabled=False) as infinite_zoom_interface:
         gr.HTML(
@@ -56,7 +56,7 @@ def on_ui_tabs():
 
                         main_outpaint_steps = gr.Slider(
                             minimum=2,
-                            maximum=100,
+                            maximum=120,
                             step=1,
                             label="Total video length [s]",
                             value=default_total_outpaints,
@@ -169,14 +169,23 @@ def on_ui_tabs():
                         maximum=120,
                         step=1
                     )
-                    video_zoom_speed = gr.Slider(
-                        label="Zoom Speed",
-                        value=1.0,
-                        minimum=0.1,
-                        maximum=20.0,
-                        step=0.1,
-                        info="Zoom speed in seconds (higher values create slower zoom)",
-                    )
+                    with gr.Row():
+                        video_zoom_speed = gr.Slider(
+                            label="Zoom Speed",
+                            value=1.0,
+                            minimum=0.1,
+                            maximum=20.0,
+                            step=0.1,
+                            info="Zoom speed in seconds (higher values create slower zoom)",
+                        )
+                        video_est_length = gr.Number(
+                            label="Estimated video length [s]",
+                            info="a basic estimation of the video length",
+                            value=1.0,
+                            precision=1,
+                            readonly=True,
+                            id="infzoom_est_length",
+                        )
                     with gr.Accordion("FFMPEG Expert", open=False):
                         gr.Markdown(
                             """# I need FFMPEG control
@@ -216,6 +225,12 @@ You might give multiple options in one line.
                                 label='Blend Edge Color', 
                                 default='#ffff00'
                             )
+                            video_zoom_speed.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
+                            main_outpaint_steps.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
+                            video_frame_rate.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
+                            video_start_frame_dupe_amount.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
+                            video_last_frame_dupe_amount.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
+                            blend_mode.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])  
                     with gr.Accordion("Blend Info", open=False):
                         gr.Markdown(
                             """# Important Blend Info:
@@ -240,6 +255,13 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                             type="file",
                             label="Audio File")
                         audio_file.change(get_filename, inputs=[audio_file], outputs=[audio_filename])
+                    with gr.Row():
+                        audio_volume = gr.Slider(
+                            label="Audio volume",
+                            minimum=0.0,
+                            maximum=2.0,
+                            step=.05,
+                            value=1.0)
 
                 with gr.Tab("Outpaint"):
                     outpaint_amount_px = gr.Slider(
@@ -426,6 +448,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 blend_invert_do,
                 blend_color,
                 audio_filename,
+                audio_volume,
             ],
             outputs=[output_video, out_image, generation_info, html_info, html_log],
         )
@@ -454,3 +477,14 @@ def get_min_outpaint_amount(width, outpaint_amount, strategy):
     if strategy == "Center":
         min_outpaint_px = closest_upper_divisible_by_eight(max(outpaint_amount, width // 4))
     return min_outpaint_px
+
+def calc_est_video_length(blend_mode, video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,fps, main_outpaint_steps):
+    #calculates the estimated video length based on the blend mode, zoom speed, and outpaint steps
+    #this is just an estimate, the actual length will vary
+    steps = main_outpaint_steps
+    estimate = (steps * video_zoom_speed) + ((video_start_frame_dupe_amount + video_last_frame_dupe_amount) / fps)
+    if blend_mode != 0:
+        steps = (main_outpaint_steps - 3)
+        estimate = (steps * video_zoom_speed) + (((video_start_frame_dupe_amount + video_last_frame_dupe_amount) / fps) - 1.0)
+
+    return estimate

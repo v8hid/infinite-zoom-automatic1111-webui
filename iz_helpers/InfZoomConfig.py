@@ -35,6 +35,7 @@ class InfZoomConfig():
     blend_invert_do:bool
     blend_color:str
     audio_filename:str=None
+    audio_volume:float = 1
     inpainting_denoising_strength:float=1
     inpainting_full_res:int =0
     inpainting_padding:int=0

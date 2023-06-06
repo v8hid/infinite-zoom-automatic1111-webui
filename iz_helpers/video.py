@@ -139,9 +139,15 @@ class ContinuousVideoWriter:
         results = reverse_video(self._file_path, self._file_path)
 
 
-def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'ffmpeg'):
+#def add_audio_to_video(video_path, audio_path, output_path, ffmpeg_location = 'ffmpeg'):
+#    # Construct the FFmpeg command
+#    command = [ffmpeg_location, '-i', video_path, '-i', audio_path, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', output_path]
+#    subprocess.run(command)
+#    return output_path
+
+def add_audio_to_video(video_path, audio_path, output_path, volume=1.0, ffmpeg_location='ffmpeg'):
     # Construct the FFmpeg command
-    command = [ffmpeg_location, '-i', video_path, '-i', audio_path, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', output_path]
+    command = [ffmpeg_location, '-i', video_path, '-i', audio_path, '-c:v', 'copy', '-c:a', 'aac', '-map', '0:v:0', '-map', '1:a:0', '-shortest', '-af', f'volume={volume}', output_path]
     subprocess.run(command)
     return output_path
 
