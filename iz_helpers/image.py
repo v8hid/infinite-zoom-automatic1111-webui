@@ -5,8 +5,10 @@ import base64
 import numpy as np
 import math
 from io import BytesIO
+import os
 from modules.processing import apply_overlay, slerp
 from timeit import default_timer as timer
+from typing import List, Union
 
 
 def shrink_and_paste_on_blank(current_image, mask_width, mask_height, blank_color:tuple[int, int, int, int] = (0,0,0,0)):
@@ -90,6 +92,8 @@ def convert_to_rgba(images):
     end = timer()
     print(f"rgb convert:{end - start}")
     return rgba_images
+
+######################################################## lerp ########################################################
 
 def lerp(value1, value2, factor):
     """
@@ -195,6 +199,77 @@ def lerp_imagemath_RGBA(img1, img2, alphaimg, factor:int = 50):
 def CMYKInvert(img) :
     return Image.merge(img.mode, [ImageOps.invert(b.convert('L')) for b in img.split()])
 
+##################################################### LUTs ############################################################
+
+def is_3dlut_row(row: List[str]) -> bool:
+    """
+    Check if one line in the file has exactly 3 numeric values.
+
+    Args:
+        row: A list of strings representing the values in a row.
+
+    Returns:
+        True if the row has exactly 3 numeric values, False otherwise.
+    """
+    try:
+        row_values = [float(val) for val in row]
+        return len(row_values) == 3
+    except ValueError:
+        return False
+
+
+def read_lut(path_lut: Union[str, os.PathLike], num_channels: int = 3) -> ImageFilter.Color3DLUT:
+    """
+    Read LUT from a raw file.
+
+    Each line in the file is considered part of the LUT table. The function
+    reads the file, parses the rows, and constructs a Color3DLUT object.
+
+    Args:
+        path_lut: A string or os.PathLike object representing the path to the LUT file.
+        num_channels: An integer specifying the number of color channels in the LUT (default is 3).
+
+    Returns:
+        An instance of ImageFilter.Color3DLUT representing the LUT.
+
+    Raises:
+        FileNotFoundError: If the LUT file specified by path_lut does not exist.
+    """
+    with open(path_lut) as f:
+        lut_raw = f.read().splitlines()
+
+    size = round(len(lut_raw) ** (1 / 3))
+    row2val = lambda row: tuple([float(val) for val in row.split(" ")])
+    lut_table = [row2val(row) for row in lut_raw if is_3dlut_row(row.split(" "))]
+
+    return ImageFilter.Color3DLUT(size, lut_table, num_channels)
+
+def apply_lut(img: Image, lut_path: str = "", lut: ImageFilter.Color3DLUT = None) -> Image:
+    """
+    Apply a LUT to an image and return a PIL Image with the LUT applied.
+
+    The function applies the LUT to the input image using the filter() method of the PIL Image class.
+
+    Args:
+        img: A PIL Image object to which the LUT should be applied.
+        lut_path: A string representing the path to the LUT file (optional if lut argument is provided).
+        lut: An instance of ImageFilter.Color3DLUT representing the LUT (optional if lut_path is provided).
+
+    Returns:
+        A PIL Image object with the LUT applied.
+
+    Raises:
+        ValueError: If both lut_path and lut arguments are not provided.
+    """
+    if lut is None:
+        if lut_path == "":
+            raise ValueError("Either lut_path or lut argument must be provided.")
+        lut = read_lut(lut_path)
+
+    return img.filter(lut)
+
+##################################################### Masks ############################################################
+
 def combine_masks(mask:Image, altmask:Image, width:int, height:int):
     """
     Combine two masks using lighter color
@@ -207,6 +282,8 @@ def combine_masks(mask:Image, altmask:Image, width:int, height:int):
     #altmask.show()
     result = ImageChops.lighter(mask, altmask)
     return result
+
+##################################################### Gradients #########################################################
 
 def clip_gradient_image(gradient_image, min_value:int = 50, max_value:int =75, invert= False, mask = False):
     """
@@ -667,6 +744,8 @@ def multiply_alpha(image, factor):
     end = timer()
     print(f"multiply_alpha:{end - start}")
     return result_image
+
+#################################################################### Blends and Wipes ####################################################################
 
 def blend_images(start_image: Image, stop_image: Image, num_frames: int, invert:bool = False) -> list:
     """

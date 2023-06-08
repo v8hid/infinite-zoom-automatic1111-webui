@@ -15,7 +15,17 @@ from .helpers import (
     do_upscaleImg,value_to_bool, find_ffmpeg_binary
 )
 from .sd_helpers import renderImg2Img, renderTxt2Img
-from .image import multiply_alpha, shrink_and_paste_on_blank, open_image, apply_alpha_mask, draw_gradient_ellipse, resize_and_crop_image, crop_fethear_ellipse, crop_inner_image, combine_masks
+from .image import (
+    multiply_alpha, 
+    shrink_and_paste_on_blank, 
+    open_image, 
+    apply_alpha_mask, 
+    draw_gradient_ellipse, 
+    resize_and_crop_image, 
+    crop_fethear_ellipse, 
+    crop_inner_image, 
+    apply_lut, 
+    read_lut)
 from .video import write_video, add_audio_to_video, ContinuousVideoWriter
 from .InfZoomConfig import InfZoomConfig
 
@@ -116,6 +126,13 @@ class InfZoomer:
         load_model_from_setting("infzoom_inpainting_model", self.C.progress, "Loading Model for inpainting/img2img: ")
 
         processed = self.fnOutpaintMainFrames()
+
+        if self.C.lut_filename is not None:
+            try:
+                #processed = apply_lut(processed, self.C.lut_filename)
+                self.main_frames = [apply_lut(frame, self.C.lut_filename) for frame in self.main_frames]
+            except Exception as e:
+                input(f"Skip LUT: Error applying LUT {str(e)}. Enter to continue...")
 
         #trim frames that are blended or luma wiped
         self.start_frames = self.main_frames[:2]
@@ -231,6 +248,7 @@ class InfZoomer:
     
     def outpaint_steps_cornerStrategy(self):
         current_image = self.main_frames[-1]
+        exit_img = None
 
         # just 30 radius to get inpaint connected between outer and innter motive
         masked_image = create_mask_with_circles(

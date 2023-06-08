@@ -241,6 +241,18 @@ Free to use grayscale blend images can be found here: https://github.com/Oncorpo
 Ideas for custom blend images: https://www.pexels.com/search/gradient/
 """
                         )
+                    with gr.Row():
+                        lut_filename = gr.Textbox(
+                            value=None, 
+                            label="Look Up Table (LUT) File Name",
+                            elem_id="infzoom_lutFileName")
+                        lut_file = gr.File(
+                            value=None,
+                            file_count="single",
+                            file_types=[".cube"],
+                            type="file",
+                            label="LUT cube File")
+                        lut_file.change(get_filename, inputs=[lut_file], outputs=[lut_filename])
 
                 with gr.Tab("Audio"):
                     with gr.Row():
@@ -447,6 +459,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 blend_gradient_size,
                 blend_invert_do,
                 blend_color,
+                lut_filename,
                 audio_filename,
                 audio_volume,
             ],
@@ -469,7 +482,10 @@ def checkPrompts(p):
     )
 
 def get_filename(file):
-    return file.name
+    filename = None
+    if file is not None:
+        filename = file.name
+    return filename
 
 def get_min_outpaint_amount(width, outpaint_amount, strategy):
     #automatically sets the minimum outpaint amount based on the width for Center strategy
