@@ -1,7 +1,7 @@
 // Function to download data to a file
-function exportPrompts(cppre, p, cpsuf, np, afn, s, filename = "infinite-zoom-prompts.json") {
+function exportPrompts(cppre, p, cpsuf, np, afn, s, w, h, smpl, gs, stps, lfn, opamt, mbr, ovm, opstr, zm, fps, zs, sf, lf, bm, bc, bg, bi, filename = "infinite-zoom-prompts.json") {
 
-    let J = { prompts: p, negPrompt: np, prePrompt: cppre, postPrompt: cpsuf, audioFileName: afn, seed: s }
+    let J = { prompts: p, negPrompt: np, prePrompt: cppre, postPrompt: cpsuf, audioFileName: afn, seed: s , width: w, height: h, sampler: smpl, guidanceScale: gs, steps: stps, lutFileName: lfn, outpaintAmount: opamt, maskBlur: mbr, overmask: ovm, outpaintStrategy: opstr, zoomMode: zm, fps: fps, zoomSpeed: zs, startFrames: sf, lastFrames: lf, blendMode: bm, blendColor: bc, blendGradient: bg, blendInvert: bi}
 
     var file = new Blob([JSON.stringify(J,null,2)], { type: "text/csv" });
     if (window.navigator.msSaveOrOpenBlob) // IE10+

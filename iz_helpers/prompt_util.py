@@ -7,6 +7,13 @@ from .static_variables import (
     jsonprompt_schemafile,
     promptTableHeaders,
     default_total_outpaints,
+    default_outpaint_amount,
+    default_gradient_size,
+    default_mask_blur,
+    default_sampler,
+    default_cfg_scale,
+    default_sampling_steps,
+    default_overmask
 )
 prompts_keys = (default_total_outpaints, default_total_outpaints)
 
@@ -45,6 +52,65 @@ def completeOptionals(j):
 
         if "seed" not in j:
                 j["seed"]= -1
+
+        if "width" not in j:
+            j["width"]= 768
+
+        if "height" not in j:
+            j["height"]= 512
+
+        if "sampler" not in j:
+            j["sampler"]= default_sampler
+
+        if "guidanceScale" not in j:
+            j["guidanceScale"]= default_cfg_scale
+
+        if "steps" not in j:
+            j["steps"]= default_sampling_steps
+
+        if "lutFileName" not in j:
+            j["lutFileName"]= None
+
+        if "outpaintAmount" not in j:
+            j["outpaintAmount"]= default_outpaint_amount
+
+        if "maskBlur" not in j:
+            j["maskBlur"]= default_mask_blur
+
+        if "overmask" not in j:
+                j["overmask"]= default_overmask
+
+        if "outpaintStrategy" not in j:
+            j["outpaintStrategy"]= "Corners"
+
+        if "zoomMode" not in j:
+            j["zoomMode"]= "Zoom-out"
+
+        if "fps" not in j:
+            j["fps"]= 30
+
+        if "zoomSpeed" not in j:
+            j["zoomSpeed"]= 1
+
+        if "startFrames" not in j:
+            j["startFrames"]= 0
+
+        if "lastFrames" not in j:
+            j["lastFrames"]= 0
+
+        if "blendMode" not in j:
+            j["blendMode"]= "None"
+
+        if "blendColor" not in j:
+            j["blendColor"]= "#ffff00"
+
+        if "blendGradient" not in j:
+            j["blendGradient"]= default_gradient_size
+
+        if "blendInvert" not in j:
+            j["blendInvert"]= False
+        
+
     return j
 
 def validatePromptJson_throws(data):

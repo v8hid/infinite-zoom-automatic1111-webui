@@ -27,12 +27,31 @@ default_prompt = """
     "postPrompt": "epic perspective,(vegetation overgrowth:1.3)(intricate, ornamentation:1.1),(baroque:1.1), fantasy, (realistic:1) digital painting , (magical,mystical:1.2) , (wide angle shot:1.4), (landscape composed:1.2)(medieval:1.1),(tropical forest:1.4),(river:1.3) volumetric lighting ,epic, style by Alex Horley Wenjun Lin greg rutkowski Ruan Jia (Wayne Barlowe:1.2)",
     "negPrompt": "frames, border, edges, borderline, text, character, duplicate, error, out of frame, watermark, low quality, ugly, deformed, blur, bad-artist",
     "audioFileName": None,
-    "seed":-1
+    "seed":-1,
+    "width": 512,
+    "height": 512,
+    "sampler": "DDIM",
+    "guidanceScale": 8.0,
+    "steps": 35,
+    "lutFileName": "",
+    "outpaintAmount": 128,
+    "maskBlur": 48,
+    "overmask": 8,
+    "outpaintStrategy": "Corner",
+    "zoomMode": "Zoom-out",
+    "fps": 30,
+    "zoomSpeed": 1,
+    "startFrames": 0,
+    "lastFrames": 0,
+    "blendMode": "None",
+    "blendColor": "#ffff00",
+    "blendGradient": 61,
+    "blendInvert": false
 }
 """
 
 empty_prompt = (
-    '{"prompts":{"data":[0,"","","",false],"headers":["Outpaintg Steps","prompt","image location", "blend mask location", "is keyframe"]},"negPrompt":"", "prePrompt":"", "postPrompt":"", "audioFileName":None, "seed":-1}'
+    '{"prompts":{"data":[0,"","","",false],"headers":["Outpaintg Steps","prompt","image location", "blend mask location", "is keyframe"]},"negPrompt":"", "prePrompt":"", "postPrompt":"", "audioFileName":None, "seed":-1, "width": 512, "height": 512, "sampler": "DDIM", "guidanceScale": 8.0, "steps": 35, "lutFileName": "", "outpaintAmount": 128, "maskBlur": 48, "overmask": 8, "outpaintStrategy": "Corner", "zoomMode": "Zoom-out", "fps": 30, "zoomSpeed": 1, "startFrames": 0, "lastFrames": 0, "blendMode": "None", "blendColor": "#ffff00", "blendGradient": 61, "blendInvert": false}'
 )
 
 invalid_prompt = {
@@ -44,7 +63,26 @@ invalid_prompt = {
     "prePrompt": "Invalid prompt",
     "postPrompt": "Invalid prompt",
     "audioFileName": None,
-    "seed":-1
+    "seed":-1,
+    "width": 512,
+    "height": 512,
+    "sampler": "DDIM",
+    "guidanceScale": 8.0,
+    "steps": 35,
+    "lutFileName": "",
+    "outpaintAmount": 128,
+    "maskBlur": 48,
+    "overmask": 8,
+    "outpaintStrategy": "Corner",
+    "zoomMode": "Zoom-out",
+    "fps": 30,
+    "zoomSpeed": 1,
+    "startFrames": 0,
+    "lastFrames": 0,
+    "blendMode": "None",
+    "blendColor": "#ffff00",
+    "blendGradient": 61,
+    "blendInvert": False
 }
 
 available_samplers = [

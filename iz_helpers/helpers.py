@@ -113,7 +113,26 @@ def putPrompts(files):
                 gr.Textbox.update(data["negPrompt"]),
                 gr.Slider.update(value=prompts_keys[0]),
                 gr.Textbox.update(data["audioFileName"]),
-                gr.Number.update(data["seed"])
+                gr.Number.update(data["seed"]),
+                gr.Slider.update(data["width"]),
+                gr.Slider.update(data["height"]),
+                gr.Dropdown.update(data["sampler"]),
+                gr.Slider.update(data["guidanceScale"]),
+                gr.Slider.update(data["steps"]),
+                gr.Textbox.update(data["lutFileName"]),
+                gr.Slider.update(data["outpaintAmount"]),
+                gr.Slider.update(data["maskBlur"]),
+                gr.Slider.update(data["overmask"]),
+                gr.Radio.update(data["outpaintStrategy"]),
+                gr.Radio.update(data["zoomMode"]),
+                gr.Slider.update(data["fps"]),
+                gr.Slider.update(data["zoomSpeed"]),
+                gr.Slider.update(data["startFrames"]),
+                gr.Slider.update(data["lastFrames"]),
+                gr.Radio.update(data["blendMode"]),
+                gr.ColorPicker.update(data["blendColor"]),
+                gr.Slider.update(data["blendGradient"]),
+                gr.Checkbox.update(data["blendInvert"])            
             ]
 
     except Exception:
@@ -123,7 +142,11 @@ def putPrompts(files):
         # error only be shown with raise, so ui gets broken.
         #asyncio.run(showGradioErrorAsync("Loading your prompts failed. It seems to be invalid. Your prompt table has been preserved.",5))
 
-        return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update(),gr.Textbox.update(),gr.Number.update()]
+        return [gr.Textbox.update(), gr.DataFrame.update(), gr.Textbox.update(),gr.Textbox.update(), gr.Textbox.update(), gr.Textbox.update(),gr.Number.update(), 
+                gr.Slider.update(), gr.Slider.update(), gr.Dropdown.update(), gr.Slider.update(), gr.Slider.update(), gr.Textbox.update(), gr.Slider.update(), gr.Slider.update(), 
+                gr.Slider.update(), gr.Radio.update(), gr.Radio.update(), gr.Slider.update(), gr.Slider.update(), 
+                gr.Slider.update(), gr.Slider.update(), gr.Radio.update(), gr.ColorPicker.update(), gr.Slider.update(), 
+                gr.Checkbox.update()]
 
 
 def clearPrompts():
@@ -134,6 +157,26 @@ def clearPrompts():
         gr.Textbox.update(""),
         gr.Textbox.update(None),
         gr.Number.update(-1),
+        gr.Slider.update(value=768),
+        gr.Slider.update(value=512),
+        gr.Dropdown.update("DDIM"),
+        gr.Slider.update(value=8),
+        gr.Slider.update(value=35),
+        gr.Textbox.update(""),
+        gr.Slider.update(value=128),
+        gr.Slider.update(value=48),
+        gr.Slider.update(value=8),
+        gr.Radio.update("Center"),
+        gr.Radio.update(value=0),
+        gr.Slider.update(value=30),
+        gr.Slider.update(value=1),
+        gr.Slider.update(value=0),
+        gr.Slider.update(value=0),
+        gr.Radio.update("None"),
+        gr.ColorPicker.update("#ffff00"),
+        gr.Slider.update(value=61),
+        gr.Checkbox.update(False),
+        gr.Image.update(None)
     ]
 
 def value_to_bool(value):

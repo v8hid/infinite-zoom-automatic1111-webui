@@ -72,6 +72,63 @@
     },
     "seed": {
       "type": "integer"
+    },
+    "width": {
+      "type": "integer"
+    },
+    "height": {
+      "type": "integer"
+    },
+    "sampler": {
+      "type": "string"
+    },
+    "guidanceScale": {
+      "type": "number"
+    },
+    "steps": {
+      "type": "integer"
+    },
+    "lutFileName": {
+      "type": "string"
+    },
+    "outpaintAmount": {
+      "type": "integer"
+    },
+    "maskBlur": {
+      "type": "integer"
+    },
+    "overmask": {
+      "type": "integer"
+    },
+    "outpaintStrategy": {
+      "type": "string"
+    },
+    "zoomMode": {
+      "type": "string"
+    },
+    "fps": {
+      "type": "integer"
+    },
+    "zoomSpeed": {
+      "type": "integer"
+    },
+    "startFrames": {
+      "type": "integer"
+    },
+    "lastFrames": {
+      "type": "integer"
+    },
+    "blendMode": {
+      "type": "string"
+    },
+    "blendColor": {
+      "type": "string"
+    },
+    "blendGradient": {
+      "type": "integer"
+    },
+    "blendInvert": {
+      "type": "boolean"
     }
   },
   "required": [

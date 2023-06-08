@@ -109,14 +109,14 @@ def on_ui_tabs():
                             main_width = gr.Slider(
                                 minimum=16,
                                 maximum=2048,
-                                value=shared.opts.data.get("infzoom_outsizeW", 512),
+                                value=jpr["width"] if jpr["width"] != shared.opts.data.get("infzoom_outsizeW", 512) else shared.opts.data.get("infzoom_outsizeW", 512),
                                 step=8,
                                 label="Output Width",
                             )                            
                             main_height = gr.Slider(
                                 minimum=16,
                                 maximum=2048,
-                                value=shared.opts.data.get("infzoom_outsizeH", 512),
+                                value=jpr["height"] if jpr["height"] != shared.opts.data.get("infzoom_outsizeH", 512) else shared.opts.data.get("infzoom_outsizeH", 512),
                                 step=8,
                                 label="Output Height",
                             )
@@ -125,14 +125,14 @@ def on_ui_tabs():
                                 minimum=0.1,
                                 maximum=15,
                                 step=0.1,
-                                value=default_cfg_scale,
+                                value=jpr["guidanceScale"],
                                 label="Guidance Scale",
                             )
                             sampling_step = gr.Slider(
                                 minimum=1,
                                 maximum=150,
                                 step=1,
-                                value=default_sampling_steps,
+                                value=jpr["steps"],
                                 label="Sampling Steps for each outpaint",
                             )
                         with gr.Row():
@@ -150,13 +150,13 @@ def on_ui_tabs():
                     video_zoom_mode = gr.Radio(
                         label="Zoom mode",
                         choices=["Zoom-out", "Zoom-in"],
-                        value="Zoom-out",
+                        value=jpr["zoomMode"],
                         type="index",
                     )
                     video_start_frame_dupe_amount = gr.Slider(
                         label="number of start frame dupe",
                         info="Frames to freeze at the start of the video",
-                        value=0,
+                        value=jpr["startFrames"],
                         minimum=1,
                         maximum=120,
                         step=1
@@ -164,7 +164,7 @@ def on_ui_tabs():
                     video_last_frame_dupe_amount = gr.Slider(
                         label="number of last frame dupe",
                         info="Frames to freeze at the end of the video",
-                        value=0,
+                        value=jpr["lastFrames"],
                         minimum=1,
                         maximum=120,
                         step=1
@@ -172,7 +172,7 @@ def on_ui_tabs():
                     with gr.Row():
                         video_zoom_speed = gr.Slider(
                             label="Zoom Speed",
-                            value=1.0,
+                            value=jpr["zoomSpeed"],
                             minimum=0.1,
                             maximum=20.0,
                             step=0.1,
@@ -209,21 +209,21 @@ You might give multiple options in one line.
                             blend_mode = gr.Radio(
                                 label="Blend Mode",
                                 choices=["None", "Simple Blend", "Alpha Composite", "Luma Wipe"],
-                                value="Luma Wipe",
+                                value=jpr["blendMode"],
                                 type="index",
                             )
-                            blend_invert_do = gr.Checkbox(False, label="Reverse Blend/Wipe")
+                            blend_invert_do = gr.Checkbox(jpr["blendInvert"], label="Reverse Blend/Wipe")
                         with gr.Row():
                             blend_gradient_size = gr.Slider(
                                 label="Blend Gradient size",
                                 minimum=25,
                                 maximum=75,
-                                value=default_gradient_size,
+                                value=jpr["blendGradient"],
                                 step=1
                             )
                             blend_color = gr.ColorPicker(
                                 label='Blend Edge Color', 
-                                default='#ffff00'
+                                default=jpr["blendColor"]
                             )
                             video_zoom_speed.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
                             main_outpaint_steps.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
@@ -243,7 +243,7 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                         )
                     with gr.Row():
                         lut_filename = gr.Textbox(
-                            value=None, 
+                            value=jpr["lutFileName"], 
                             label="Look Up Table (LUT) File Name",
                             elem_id="infzoom_lutFileName")
                         lut_file = gr.File(
@@ -281,7 +281,7 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                         minimum=8,
                         maximum=512,
                         step=8,
-                        value=default_outpaint_amount,
+                        value=jpr["outpaintAmount"],
                         elem_id="infzoom_outpaintAmount"
                     )
 
@@ -290,14 +290,14 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                         minimum=0,
                         maximum=64,
                         step=1,
-                        value=default_mask_blur,
+                        value=jpr["maskBlur"],
                     )
                     overmask = gr.Slider(
                         label="Overmask (px) paint a bit into centered image",
                         minimum=0,
                         maximum=64,
                         step=1,
-                        value=default_overmask,
+                        value=jpr["overmask"],
                         elem_id="infzoom_outpaintOvermask"
                     )
                     inpainting_fill_mode = gr.Radio(
@@ -310,7 +310,7 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                     outpaintStrategy= gr.Radio(
                         label="Outpaint Strategy",
                         choices=["Center", "Corners"],
-                        value="Corners",
+                        value=jpr["outpaintStrategy"],
                         type="value",
                         elem_id="infzoom_outpaintStrategy"
                     )
@@ -364,7 +364,26 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                         main_common_prompt_suf,
                         main_negative_prompt,
                         audio_filename,
-                        main_seed
+                        main_seed,
+                        main_width,
+                        main_height,
+                        main_sampler,
+                        main_guidance_scale,
+                        sampling_step,
+                        lut_filename,
+                        outpaint_amount_px,
+                        inpainting_mask_blur,
+                        overmask,
+                        outpaintStrategy,
+                        video_zoom_mode,
+                        video_frame_rate,
+                        video_zoom_speed,
+                        video_start_frame_dupe_amount,
+                        video_last_frame_dupe_amount,
+                        blend_mode,
+                        blend_color,
+                        blend_gradient_size,
+                        blend_invert_do,
                     ],
                     outputs=None,
                 )
@@ -377,7 +396,26 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                         main_negative_prompt,
                         main_outpaint_steps,
                         audio_filename,
-                        main_seed
+                        main_seed,
+                        main_width,
+                        main_height,
+                        main_sampler,
+                        main_guidance_scale,
+                        sampling_step,
+                        lut_filename,
+                        outpaint_amount_px,
+                        inpainting_mask_blur,
+                        overmask,
+                        outpaintStrategy,
+                        video_zoom_mode,
+                        video_frame_rate,
+                        video_zoom_speed,
+                        video_start_frame_dupe_amount,
+                        video_last_frame_dupe_amount,
+                        blend_mode,
+                        blend_color,
+                        blend_gradient_size,
+                        blend_invert_do,
                     ],
                     inputs=[importPrompts_button],
                 )
@@ -397,7 +435,26 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                         main_common_prompt_pre,
                         main_common_prompt_suf,
                         audio_filename,
-                        main_seed
+                        main_seed,
+                        main_width,
+                        main_height,
+                        main_sampler,
+                        main_guidance_scale,
+                        sampling_step,
+                        lut_filename,
+                        outpaint_amount_px,
+                        inpainting_mask_blur,
+                        overmask,
+                        outpaintStrategy,
+                        video_zoom_mode,
+                        video_frame_rate,
+                        video_zoom_speed,
+                        video_start_frame_dupe_amount,
+                        video_last_frame_dupe_amount,
+                        blend_mode,
+                        blend_color,
+                        blend_gradient_size,
+                        blend_invert_do,
                     ],
                 )
                 renumberPrompts_button = gr.Button(

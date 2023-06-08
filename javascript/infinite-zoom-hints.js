@@ -14,7 +14,10 @@ infzoom_titles = {
     "Zoom Speed":"Varies additional frames per second",
     "Start at second [0,1,...]": "At which time the prompt has to be occure. We need at least one prompt starting at time 0",
 	"Generate video": "Start rendering. If it´s disabled the prompt table is invalid, check we have a start prompt at time 0",
-	"Audio File Name": "File used to mix audio over the video. The shorter of the two (audio, video) length is used"
+	"Audio File Name": "File used to mix audio over the video. The shorter of the two (audio, video) length is used",
+	"Audio Volume": "Volume of the audio file. 0.0 is silent, 1.0 is full volume. Max volume is 2.0",
+	"Look Up Table (LUT) File Name": "File used to apply a color look up table to the video. The file extension is .CUBE",
+	"Blend Gradient size": "Radius size of the gradient used to blend images, somewhere around 60% is typical.",
 }
 
 
