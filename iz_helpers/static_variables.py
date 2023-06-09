@@ -11,6 +11,7 @@ default_overmask = 8
 default_total_outpaints = 5
 default_outpaint_amount = 128
 promptTableHeaders = ["Outpaint Steps", "Prompt", "image location", "blend mask", "is keyframe"], ["number", "str", "str", "str", "bool"]
+default_lut_example_img = "extensions\\infinite-zoom-automatic1111-webui\\LUT\\daisy.jpg"
 
 default_prompt = """
 {

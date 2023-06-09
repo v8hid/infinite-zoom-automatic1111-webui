@@ -132,7 +132,7 @@ class InfZoomer:
                 #processed = apply_lut(processed, self.C.lut_filename)
                 self.main_frames = [apply_lut(frame, self.C.lut_filename) for frame in self.main_frames]
             except Exception as e:
-                input(f"Skip LUT: Error applying LUT {str(e)}. Enter to continue...")
+                print(f"Skip LUT: Error applying LUT {str(e)}.")
 
         #trim frames that are blended or luma wiped
         self.start_frames = self.main_frames[:2]

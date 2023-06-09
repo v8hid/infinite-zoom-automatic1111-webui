@@ -19,10 +19,13 @@ from .static_variables import (
     default_overmask,
     default_gradient_size,
     default_outpaint_amount,
+    default_lut_example_img,
 )
 from .helpers import validatePromptJson_throws, putPrompts, clearPrompts, renumberDataframe, closest_upper_divisible_by_eight
 from .prompt_util import readJsonPrompt
 from .static_variables import promptTableHeaders
+from PIL import Image
+from .image import apply_lut, open_image
 
 
 def on_ui_tabs():
@@ -252,7 +255,9 @@ Ideas for custom blend images: https://www.pexels.com/search/gradient/
                             file_types=[".cube"],
                             type="file",
                             label="LUT cube File")
+                        lut_example_image = gr.Image(type="pil", label="LUT Example Image", value=default_lut_example_img)
                         lut_file.change(get_filename, inputs=[lut_file], outputs=[lut_filename])
+                        lut_filename.change(show_lut, inputs=[lut_filename, lut_example_image], outputs=[lut_example_image])
 
                 with gr.Tab("Audio"):
                     with gr.Row():
@@ -543,6 +548,16 @@ def get_filename(file):
     if file is not None:
         filename = file.name
     return filename
+
+def show_lut(lut_filename: str, lut_example_image: Image = default_lut_example_img) -> Image:
+    if lut_filename is not None:        
+        try:
+            lut_example_image = apply_lut(lut_example_image, lut_filename)
+        except Exception as e:
+            print(f"BAD LUT: Error applying LUT {str(e)}.")
+    else:
+        lut_example_image = open_image(default_lut_example_img)
+    return lut_example_image
 
 def get_min_outpaint_amount(width, outpaint_amount, strategy):
     #automatically sets the minimum outpaint amount based on the width for Center strategy
