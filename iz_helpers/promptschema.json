@@ -110,7 +110,7 @@
       "type": "integer"
     },
     "zoomSpeed": {
-      "type": "integer"
+      "type": "number"
     },
     "startFrames": {
       "type": "integer"
