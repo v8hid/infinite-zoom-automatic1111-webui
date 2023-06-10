@@ -44,20 +44,23 @@ def open_image(image_path):
     Returns:
         Image: A PIL Image object of the opened image.
     """
-    # Strip leading and trailing double quotation marks, if present
-    image_path = image_path.strip('"')
-    if image_path.startswith('http'):
-        # If the image path is a URL, download the image using requests
-        response = requests.get(image_path)
-        img = Image.open(BytesIO(response.content))
-    elif image_path.startswith('data'):
-        # If the image path is a DataURL, decode the base64 string
-        encoded_data = image_path.split(',')[1]
-        decoded_data = base64.b64decode(encoded_data)
-        img = Image.open(BytesIO(decoded_data))
-    else:
-        # Assume that the image path is a file path
-        img = Image.open(image_path)    
+    try:
+        # Strip leading and trailing double quotation marks, if present
+        image_path = image_path.strip('"')
+        if image_path.startswith('http'):
+            # If the image path is a URL, download the image using requests
+            response = requests.get(image_path)
+            img = Image.open(BytesIO(response.content))
+        elif image_path.startswith('data'):
+            # If the image path is a DataURL, decode the base64 string
+            encoded_data = image_path.split(',')[1]
+            decoded_data = base64.b64decode(encoded_data)
+            img = Image.open(BytesIO(decoded_data))
+        else:
+            # Assume that the image path is a file path
+            img = Image.open(image_path)
+    except Exception as e:
+        raise Exception(f'Error opening image: {e}')
     return img
 
 def apply_alpha_mask(image, mask_image, invert = False):

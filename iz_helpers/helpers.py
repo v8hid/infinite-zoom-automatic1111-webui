@@ -74,20 +74,23 @@ def do_upscaleImg(curImg, upscale_do, upscaler_name, upscale_by):
             + str(rheight),
             end="\r",
         )
-
-    pp = postprocessing_upscale.scripts_postprocessing.PostprocessedImage(curImg)
-    ups = postprocessing_upscale.ScriptPostprocessingUpscale()
-    ups.process(
-        pp,
-        upscale_mode=ups_mode,
-        upscale_by=upscale_by,
-        upscale_to_width=rwidth,
-        upscale_to_height=rheight,
-        upscale_crop=False,
-        upscaler_1_name=upscaler_name,
-        upscaler_2_name=None,
-        upscaler_2_visibility=0.0,
-    )
+    try:
+        pp = postprocessing_upscale.scripts_postprocessing.PostprocessedImage(curImg)
+        ups = postprocessing_upscale.ScriptPostprocessingUpscale()
+        ups.process(
+            pp,
+            upscale_mode=ups_mode,
+            upscale_by=upscale_by,
+            upscale_to_width=rwidth,
+            upscale_to_height=rheight,
+            upscale_crop=False,
+            upscaler_1_name=upscaler_name,
+            upscaler_2_name=None,
+            upscaler_2_visibility=0.0,
+        )
+    except Exception as e:
+        print("Infinite Zoom: upscaling failed: " + str(e))
+        return curImg
     return pp.image
 
 async def showGradioErrorAsync(txt, delay=1):
