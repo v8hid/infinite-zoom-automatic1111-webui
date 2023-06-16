@@ -51,7 +51,7 @@ This is an extension for the AUTOMATIC1111's (and Vladmandic´s) webui that allo
 
 * Heads up: Setting <ins>Mask Blur</ins> parameter above 0 will give you results that look like they've been hit by the ugly stick.
 
-* Just between us - don't forget to uncheck <ins> Apply color correction to img2img results to match original colors</ins> in the Stable Diffusion tab of the WebUI settings. You don't want your results looking like a bad Instagram filter.
+* Just between us - don't forget to **uncheck** <ins> Apply color correction to img2img results to match original colors</ins> in the Stable Diffusion tab of the WebUI settings. You don't want your results looking like a bad Instagram filter.
 
 </details>
 
