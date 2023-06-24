@@ -127,7 +127,7 @@ class InfZoomer:
 
         processed = self.fnOutpaintMainFrames()
 
-        if self.C.lut_filename is not None:
+        if self.C.lut_filename != "":
             try:
                 #processed = apply_lut(processed, self.C.lut_filename)
                 self.main_frames = [apply_lut(frame, self.C.lut_filename) for frame in self.main_frames]
@@ -137,7 +137,7 @@ class InfZoomer:
         #trim frames that are blended or luma wiped
         self.start_frames = self.main_frames[:2]
         self.end_frames = self.main_frames[(len(self.main_frames) - 2):]
-        if (self.C.blend_mode != 0):
+        if (self.C.blend_mode != 0) and ((int(self.C.video_start_frame_dupe_amount) > 0) or (int(self.C.video_last_frame_dupe_amount) > 0)):
             #trim first and last frames only from main_frames, store 2 frames in each start_frames and end_frames for blending
             self.main_frames = self.main_frames[1:(len(self.main_frames) - 1)]
         print(f"Trimmed Blending Mode frames: start_frames:{len(self.start_frames)} end_frames:{len(self.end_frames)} main_frames:{len(self.main_frames)}")
@@ -170,7 +170,7 @@ class InfZoomer:
         
         self.fnInterpolateFrames() # changes main_frame and writes to video
 
-        if self.C.audio_filename is not None:
+        if (self.C.audio_filename is not None) and (len(self.C.audio_filename) > 0 ):
             self.out_config["video_filename"] = add_audio_to_video(self.out_config["video_filename"], self.C.audio_filename, str.replace(self.out_config["video_filename"], ".mp4", "_audio.mp4"), self.C.audio_volume, find_ffmpeg_binary())
 
         print("Video saved in: " + os.path.join(script_path, self.out_config["video_filename"]))
@@ -178,9 +178,10 @@ class InfZoomer:
         return (
             self.out_config["video_filename"],
             self.main_frames,
+            self.C.seed,
             processed.js(),
             plaintext_to_html(processed.info),
-            plaintext_to_html(""),
+            plaintext_to_html(""),            
         )
 
     def doUpscaling(self):
@@ -212,7 +213,7 @@ class InfZoomer:
         else:
             if self.prompt_images[min(k for k in self.prompt_images.keys() if k >= 0)] == "":
                 load_model_from_setting("infzoom_txt2img_model", self.C.progress, "Loading Model for txt2img: ")
-                processed, self.current_seed = self.renderFirstFrame()
+                processed, self.C.seed = self.renderFirstFrame()
                 if len(processed.images) > 0:
                     current_image = processed.images[0]
                     self.save2Collect(current_image, f"init_txt2img.png")
@@ -268,8 +269,12 @@ class InfZoomer:
             alpha_mask = self.getAlphaMask(*current_image.size, i + 1)
 
             #keyframes are not outpainted
-            paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
-            print(f"paste_prev_image: {paste_previous_image} {i + 1}")
+            try:
+                paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
+                print(f"paste_prev_image: {paste_previous_image} {i + 1}")
+            except KeyError:
+                print(f"Your Prompt List is missing key {i + 1}")
+                break
 
             if self.C.custom_exit_image and ((i + 1) == outpaint_steps):
                 current_image = cv2_to_pil(cv2.resize(
@@ -297,7 +302,7 @@ class InfZoomer:
                     expanded_image.paste(current_image, (self.mask_width,self.mask_height))
                     pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
                 
-                    processed, newseed = renderImg2Img(
+                    processed, self.C.seed = renderImg2Img(
                         f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
                         self.C.negative_prompt,
                         self.C.sampler,
@@ -394,8 +399,12 @@ class InfZoomer:
             # create mask (black image with white mask_width width edges)
 
             #keyframes are not inpainted
-            paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
-            print(f"paste_prev_image: {paste_previous_image} {i} {i + 1}")
+            try:
+                paste_previous_image = not self.prompt_image_is_keyframe[(i + 1)]
+                print(f"paste_prev_image: {paste_previous_image} {i} {i + 1}")
+            except KeyError:
+                print(f"Your Prompt List is missing key {i + 1}")
+                break
 
             if self.C.custom_exit_image and ((i + 1) == outpaint_steps):
                 current_image = cv2_to_pil(
@@ -413,7 +422,7 @@ class InfZoomer:
                 if self.prompt_images[max(k for k in self.prompt_images.keys() if k <= (i + 1))] == "":
                     pr = self.prompts[max(k for k in self.prompts.keys() if k <= i)]
 
-                    processed, seed = renderImg2Img(
+                    processed, self.C.seed = renderImg2Img(
                         f"{self.C.common_prompt_pre}\n{pr}\n{self.C.common_prompt_suf}".strip(),
                         self.C.negative_prompt,
                         self.C.sampler,
@@ -563,6 +572,8 @@ class InfZoomer:
                                             self.C.blend_gradient_size,
                                             hex_to_rgba(self.C.blend_color))
 
+        if  len(self.main_frames) <2:
+            raise ValueError("Not enough frames for interpolation, possibly disable Luma Wipes")
         # Build interpolation frames
         # last frame skip interpolation
         for i in range(1, len(self.main_frames)):

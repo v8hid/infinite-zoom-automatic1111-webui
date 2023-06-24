@@ -102,6 +102,10 @@ def validatePromptJson_throws(data):
         schema = json.load(s)
     validate(instance=data, schema=schema)
 
+def recalcPromptKeys(data):
+    prompts_keys = process_keys(data)
+    return prompts_keys[0]
+
 def putPrompts(files):                
     try:
         with open(files.name, "r") as f:

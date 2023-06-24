@@ -20,8 +20,9 @@ from .static_variables import (
     default_gradient_size,
     default_outpaint_amount,
     default_lut_example_img,
+    default_Luma_wipe_img,
 )
-from .helpers import validatePromptJson_throws, putPrompts, clearPrompts, renumberDataframe, closest_upper_divisible_by_eight
+from .helpers import validatePromptJson_throws, putPrompts, clearPrompts, renumberDataframe, closest_upper_divisible_by_eight, recalcPromptKeys
 from .prompt_util import readJsonPrompt
 from .static_variables import promptTableHeaders
 from PIL import Image
@@ -102,6 +103,8 @@ def on_ui_tabs():
                                 precision=0, 
                                 interactive=True
                             )
+                            gr.Button('\U0001f3b2\ufe0f').style(full_width=False).click(fn=lambda: -1, outputs=[main_seed], queue=False)
+                            reuse_seed = gr.Button('\u267b\ufe0f').style(full_width=False)
                             main_sampler = gr.Dropdown(
                                 label="Sampler",
                                 choices=available_samplers,
@@ -208,12 +211,13 @@ You might give multiple options in one line.
                         )
                     with gr.Accordion("Blend settings"):
                         with gr.Row():
-                            blend_image = gr.Image(type="pil", label="Custom in/out Blend Image")
+                            blend_image = gr.Image(type="pil", label="Custom in/out Blend Image", value=default_Luma_wipe_img)
                             blend_mode = gr.Radio(
                                 label="Blend Mode",
-                                choices=["None", "Simple Blend", "Alpha Composite", "Luma Wipe"],
-                                value=jpr["blendMode"],
+                                choices=["Not Used", "Simple Blend", "Alpha Composite", "Luma Wipe"],
+                                value=0, #jpr["blendMode"]
                                 type="index",
+                                elem_id="infzoom_blend_mode",
                             )
                             blend_invert_do = gr.Checkbox(jpr["blendInvert"], label="Reverse Blend/Wipe")
                         with gr.Row():
@@ -226,8 +230,9 @@ You might give multiple options in one line.
                             )
                             blend_color = gr.ColorPicker(
                                 label='Blend Edge Color', 
-                                default=jpr["blendColor"]
+                                value=jpr["blendColor"]
                             )
+                            main_prompts.change(recalcPromptKeys,inputs=[main_prompts], outputs=[main_outpaint_steps])
                             video_zoom_speed.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
                             main_outpaint_steps.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
                             video_frame_rate.change(calc_est_video_length,inputs=[blend_mode,video_zoom_speed, video_start_frame_dupe_amount,video_last_frame_dupe_amount,video_frame_rate,main_outpaint_steps],outputs=[video_est_length])
@@ -345,8 +350,7 @@ Depending on amount of frames and which upscaler you choose it might took a long
 Our best experience and trade-off is the R-ERSGAn4x upscaler.
 """
                         )
-
-
+                
                 # these buttons will be moved using JS under the dataframe view as small ones
                 exportPrompts_button = gr.Button(
                     value="Export prompts",
@@ -484,9 +488,10 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 ) = create_output_panel(
                     "infinite-zoom", shared.opts.outdir_img2img_samples
                 )
+                seed_used = gr.Number(label='Seed used', value=-1, interactive=False)
 
         generate_btn.click(
-            fn=wrap_gradio_gpu_call(createZoom, extra_outputs=[None, "", ""]),
+            fn=wrap_gradio_gpu_call(createZoom, extra_outputs=[None, None, -1, "", ""]),
             inputs=[
                 main_common_prompt_pre,
                 main_prompts,
@@ -525,13 +530,13 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                 audio_filename,
                 audio_volume,
             ],
-            outputs=[output_video, out_image, generation_info, html_info, html_log],
+            outputs=[output_video, out_image, seed_used, generation_info, html_info, html_log],
         )
 
         main_prompts.change(
             fn=checkPrompts, inputs=[main_prompts], outputs=[generate_btn]
         )
-
+        reuse_seed.click(fn=lambda x: x, inputs=[seed_used], outputs=[main_seed], queue=False)
         interrupt.click(fn=lambda: shared.state.interrupt(), inputs=[], outputs=[])
     infinite_zoom_interface.queue()
     return [(infinite_zoom_interface, "Infinite Zoom", "iz_interface")]

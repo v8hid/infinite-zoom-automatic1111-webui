@@ -120,6 +120,9 @@ class ContinuousVideoWriter:
         """
         # Duplicate the exit frames
         if blend_type != 0:
+            if blend_image is None:
+                blend_image = draw_gradient_ellipse(*exitframe.size, blend_gradient_size)
+
             if blend_type == 1:
                 end_frames = blend_images(next_to_last_frame, exitframe, math.ceil(last_frame_dupe_amount), blend_invert)
             elif blend_type == 2:

@@ -99,7 +99,7 @@ def completeOptionals(j):
             j["lastFrames"]= 0
 
         if "blendMode" not in j:
-            j["blendMode"]= "None"
+            j["blendMode"]= "Not Used"
 
         if "blendColor" not in j:
             j["blendColor"]= "#ffff00"
