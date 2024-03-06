@@ -253,6 +253,14 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                     output_video = gr.Video(label="Output").style(width=512, height=512)
                     output_panel = create_output_panel("infinite-zoom", shared.opts.outdir_img2img_samples)
                     
+                if isinstance(output_panel, tuple):
+                    (
+                        out_image,
+                        generation_info,
+                        html_info,
+                        html_log,
+                    ) = output_panel
+                else:
                     out_image = output_panel.gallery
                     generation_info = output_panel.generation_info
                     html_info = output_panel.infotext
