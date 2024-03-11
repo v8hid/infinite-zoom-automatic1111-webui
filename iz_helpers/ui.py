@@ -250,7 +250,7 @@ Our best experience and trade-off is the R-ERSGAn4x upscaler.
                         )
 
             with gr.Column(scale=1, variant="compact"):
-                output_video = gr.Video(label="Output").style(width=512, height=512)
+                output_video = gr.Video(label="Output", width=512, height=512)
                 output_panel = create_output_panel(
                     "infinite-zoom", shared.opts.outdir_img2img_samples
                 )
