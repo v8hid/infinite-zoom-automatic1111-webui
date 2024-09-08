@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageDraw
 from modules.ui import plaintext_to_html
 import modules.shared as shared
+import uuid
 from modules.paths_internal import script_path
 from .helpers import (
     fix_env_Path_ffprobe,
@@ -65,7 +66,17 @@ def crop_fethear_ellipse(image, feather_margin=30, width_offset=0, height_offset
     res.paste(cropped_image, paste_pos)
 
     return res
+progress = {
+    "current_step": 0,
+    "total_steps": 0,
+    "percentage": 0,
+}
 
+def update_progress(current_step, total_steps):
+    global progress
+    progress["current_step"] = current_step
+    progress["total_steps"] = total_steps
+    progress["percentage"] = (current_step / total_steps) * 100
 
 def outpaint_steps(
     width,
@@ -103,6 +114,7 @@ def outpaint_steps(
             + str(seed)
         )
         print(print_out)
+        update_progress(i + 1, outpaint_steps)
         current_image = main_frames[-1]
         current_image = shrink_and_paste_on_blank(
             current_image, mask_width, mask_height
@@ -493,9 +505,9 @@ def create_zoom_single(
         )
 
     frames2Collect(all_frames, out_config)
-
+    video_filename = os.path.join("outputs", "videos", f"{uuid.uuid4()}.mp4")
     write_video(
-        out_config["video_filename"],
+        video_filename,
         all_frames,
         video_frame_rate,
         video_zoom_mode,
@@ -504,7 +516,7 @@ def create_zoom_single(
     )
     print("Video saved in: " + os.path.join(script_path, out_config["video_filename"]))
     return (
-        out_config["video_filename"],
+        video_filename,
         main_frames,
         processed.js(),
         plaintext_to_html(processed.info),
